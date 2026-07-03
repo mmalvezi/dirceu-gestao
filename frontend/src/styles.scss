@@ -21,6 +21,10 @@ body{font-family:'Barlow',system-ui,sans-serif;background:var(--bg);color:var(--
 button{font-family:inherit;cursor:pointer}
 a{color:inherit;text-decoration:none}
 
+/* visível só no mobile (desktop tem a sidebar) */
+.so-mobile{display:block}
+@media(min-width:900px){.so-mobile{display:none}}
+
 /* app-icon (SVG inline injetado) */
 app-icon{display:inline-flex;line-height:0}
 app-icon span{display:inline-flex}

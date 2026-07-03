@@ -6,11 +6,12 @@ import { AuthService } from '../../core/auth.service';
 import { Icon } from '../../core/icon';
 import { Config, Usuario } from '../../core/models';
 import { ConfigService } from '../../core/services/config.service';
+import { Voltar } from '../../shared/voltar';
 
 /** Ajustes: identidade (nome/telefone/logo), sessão e sobre. */
 @Component({
   selector: 'app-ajustes',
-  imports: [FormsModule, Icon],
+  imports: [FormsModule, Icon, Voltar],
   templateUrl: './ajustes.html',
 })
 export class AjustesPage implements OnInit {

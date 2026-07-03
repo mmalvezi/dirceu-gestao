@@ -19,6 +19,7 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    false,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -115,7 +116,9 @@ class DiarioTrabalho(Base):
     ajudante_nome: Mapped[str] = mapped_column(String)  # snapshot
     horas: Mapped[Decimal] = mapped_column(Numeric(5, 1))
     valor: Mapped[Decimal] = mapped_column(Numeric(10, 2))
-    origem: Mapped[str] = mapped_column(String)  # repasse/epr_direto/bolso
+    origem: Mapped[str] = mapped_column(String)  # repasse/epr_direto/bolso/proprio
+    # "Eu trabalhei": horas do próprio Dirceu, sem valor (a remuneração é a empreita).
+    proprio: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
 
     entrada: Mapped["DiarioEntrada"] = relationship(back_populates="trabalhos")
 
@@ -138,6 +141,22 @@ class Recebimento(Base):
     obs: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     __table_args__ = (Index("ix_recebimentos_tipo_status", "tipo", "status"),)
+
+
+class Despesa(Base):
+    """Gastos do Dirceu (combustível, alimentação, material...) — saem do bolso dele."""
+
+    __tablename__ = "despesas"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    data: Mapped[date] = mapped_column(Date, index=True)
+    valor: Mapped[Decimal] = mapped_column(Numeric(10, 2))
+    categoria: Mapped[str] = mapped_column(String)  # deslocamento/alimentacao/material/outros
+    descricao: Mapped[str | None] = mapped_column(Text, nullable=True)
+    maquina_id: Mapped[int | None] = mapped_column(
+        ForeignKey("maquinas.id", ondelete="SET NULL"), nullable=True
+    )
+    maquina_nome: Mapped[str | None] = mapped_column(String, nullable=True)  # snapshot
 
 
 class RepasseEntrada(Base):

@@ -24,6 +24,7 @@
         @case ('ajudantes') { Saídas — ajudantes }
         @case ('entradas') { Entradas — recebimentos }
         @case ('fechamento') { Fechamento }
+        @case ('resultado') { Resultado do período }
       }
     </h3>
     <div class="muted">Escolha os parâmetros e gere o PDF</div>
@@ -43,7 +44,7 @@
       </div>
     }
 
-    @if (tipo === 'periodo' || tipo === 'ajudantes' || tipo === 'entradas') {
+    @if (tipo === 'periodo' || tipo === 'ajudantes' || tipo === 'entradas' || tipo === 'resultado') {
       <div class="f-2">
         <div class="f"><label>De</label><input type="date" [(ngModel)]="rDe" name="rDe" /></div>
         <div class="f"><label>Até</label><input type="date" [(ngModel)]="rAte" name="rAte" /></div>

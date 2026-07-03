@@ -48,6 +48,7 @@ def montar_entrada_out(entrada: DiarioEntrada) -> DiarioEntradaOut:
                 horas=float(t.horas),
                 valor=float(t.valor),
                 origem=t.origem,
+                proprio=t.proprio,
             )
             for t in trabalhos
         ],
@@ -81,6 +82,21 @@ def _validar_entrada(payload: DiarioEntradaIn, db: Session) -> list[DiarioTrabal
 
 
 def _montar_trabalho(t: TrabalhoIn, db: Session) -> DiarioTrabalho:
+    # "Eu trabalhei": Dirceu com horas e SEM valor (remuneração = empreita).
+    if t.proprio:
+        if t.ajudante_id is not None:
+            raise HTTPException(
+                status_code=422, detail="Trabalho próprio não leva ajudante vinculado"
+            )
+        return DiarioTrabalho(
+            ajudante_id=None,
+            ajudante_nome="Dirceu",
+            horas=t.horas,
+            valor=0,  # forçado: horas próprias não geram custo/pagamento
+            origem="proprio",
+            proprio=True,
+        )
+
     if t.origem not in ORIGENS_VALIDAS:
         raise HTTPException(status_code=422, detail="Origem inválida")
 

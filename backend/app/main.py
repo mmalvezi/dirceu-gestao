@@ -13,6 +13,7 @@ from app.routers import (
     auth,
     config as config_router,
     dashboard,
+    despesas,
     diario,
     fechamentos,
     financeiro,
@@ -55,6 +56,7 @@ app.include_router(diario.router)
 app.include_router(recebimentos.router)
 app.include_router(repasses.router)
 app.include_router(financeiro.router)
+app.include_router(despesas.router)
 app.include_router(fechamentos.router)
 app.include_router(dashboard.router)
 app.include_router(pdf.router)

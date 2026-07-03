@@ -5,6 +5,7 @@
     <button [class.on]="aba() === 'receb'" (click)="setAba('receb')">Recebimentos</button>
     <button [class.on]="aba() === 'pagto'" (click)="setAba('pagto')">Pagos a ajudantes</button>
     <button [class.on]="aba() === 'acerto'" (click)="setAba('acerto')">Acerto &amp; origens</button>
+    <button [class.on]="aba() === 'despesas'" (click)="setAba('despesas')">Despesas</button>
   </div>
 
   <!-- filtros de período (comuns às abas) -->
@@ -116,6 +117,11 @@
           <div class="v mono" style="font-size:20px">{{ fmtMoney(t.custo_total_ajudantes) }}</div>
           <div class="s">no período</div></div>
       </div>
+      <div class="grid g3" style="margin-top:10px">
+        <div class="card kpi"><div class="lb">Despesas do período</div>
+          <div class="v mono neg" style="font-size:20px">{{ fmtMoney(t.despesas_periodo) }}</div>
+          <div class="s">combustível, alimentação, material…</div></div>
+      </div>
     }
     <div class="alert a-warn" style="margin-top:12px">
       <app-icon name="alert" />
@@ -148,6 +154,86 @@
     </div>
   }
 </section>
+
+<!-- ================= ABA DESPESAS ================= -->
+@if (aba() === 'despesas') {
+  <div class="row" style="margin-bottom:10px">
+    <select [(ngModel)]="categoriaFiltro" name="categoriaFiltro" (ngModelChange)="recarregar()"
+            style="border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:13px;background:#fff">
+      <option value="">Todas as categorias</option>
+      @for (c of CATEGORIAS; track c[0]) {
+        <option [value]="c[0]">{{ c[1] }}</option>
+      }
+    </select>
+    <button class="btn btn-p btn-s" (click)="abrirDespesa(null)">+ Despesa</button>
+  </div>
+  <div class="card">
+    @if (despesas().length === 0) {
+      <p class="muted">Nenhuma despesa no período.</p>
+    }
+    <div class="list">
+      @for (d of despesas(); track d.id) {
+        <div class="row">
+          <div>
+            <b>{{ d.descricao || catLabel[d.categoria] }}</b>@if (d.maquina_nome) { — {{ d.maquina_nome }}}
+            <div class="tiny">{{ fmtData(d.data) }}</div>
+            <div style="display:flex;gap:10px;margin-top:3px">
+              <button class="tiny" style="background:none;border:0;color:var(--slate)" (click)="abrirDespesa(d)">Editar</button>
+              <button class="tiny" style="background:none;border:0;color:var(--pocket)" (click)="excluirDespesa(d)">Excluir</button>
+            </div>
+          </div>
+          <div style="text-align:right">
+            <div class="val neg">− {{ fmtMoney(d.valor) }}</div>
+            <span class="chip c-neutral">{{ catLabel[d.categoria] }}</span>
+          </div>
+        </div>
+      }
+    </div>
+  </div>
+  <div class="alert a-info" style="margin-top:12px">
+    <app-icon name="alert" />
+    <div>Despesas entram no relatório <b>Resultado do período</b> junto com as diárias pagas do bolso — é o seu ganho real.</div>
+  </div>
+}
+
+<!-- ================= MODAL DESPESA ================= -->
+@if (dpAberto()) {
+  <app-modal (fechado)="dpAberto.set(false)">
+    <h3>{{ dpEdit ? 'Editar despesa' : 'Nova despesa' }}</h3>
+    <div class="muted">Gasto seu — sai do resultado do período</div>
+    @if (dpErro()) {
+      <div class="alert a-hot"><app-icon name="alert" /><div>{{ dpErro() }}</div></div>
+    }
+    <div class="f-2">
+      <div class="f"><label>Data</label><input type="date" [(ngModel)]="dpData" name="dpData" /></div>
+      <div class="f"><label>Valor (R$)</label>
+        <input type="number" inputmode="decimal" min="0" [(ngModel)]="dpValor" name="dpValor" /></div>
+    </div>
+    <div class="f">
+      <label>Categoria</label>
+      <select [(ngModel)]="dpCategoria" name="dpCategoria">
+        @for (c of CATEGORIAS; track c[0]) {
+          <option [value]="c[0]">{{ c[1] }}</option>
+        }
+      </select>
+    </div>
+    <div class="f"><label>Descrição</label>
+      <input [(ngModel)]="dpDescricao" name="dpDescricao" placeholder="Ex.: combustível ida à usina" /></div>
+    <div class="f">
+      <label>Máquina (opcional)</label>
+      <select [(ngModel)]="dpMaquinaId" name="dpMaquinaId">
+        <option value="">Sem vínculo</option>
+        @for (m of maquinasAbertas(); track m.id) {
+          <option [value]="m.id">{{ m.nome }} — {{ m.cliente }}</option>
+        }
+      </select>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+      <button class="btn btn-o" (click)="dpAberto.set(false)">Cancelar</button>
+      <button class="btn btn-p" (click)="salvarDespesa()">Salvar</button>
+    </div>
+  </app-modal>
+}
 
 <!-- ================= MODAL ADIANTAMENTO ================= -->
 @if (adAberto()) {

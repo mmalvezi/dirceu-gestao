@@ -104,8 +104,9 @@ class TrabalhoIn(BaseModel):
     ajudante_id: int | None = None
     ajudante_nome: str | None = None
     horas: float = Field(gt=0)
-    valor: float = Field(ge=0)
-    origem: str
+    valor: float = Field(ge=0, default=0)
+    origem: str | None = None  # obrigatória quando proprio=False
+    proprio: bool = False  # "Eu trabalhei": Dirceu, só horas, valor 0
 
 
 class TrabalhoOut(BaseModel):
@@ -115,6 +116,7 @@ class TrabalhoOut(BaseModel):
     horas: float
     valor: float
     origem: str
+    proprio: bool
 
 
 class DiarioEntradaIn(BaseModel):
@@ -209,6 +211,49 @@ class FinanceiroTotais(BaseModel):
     pago_epr_direto: float        # Σ trabalhos origem "epr_direto" no período
     custo_total_ajudantes: float  # soma das três origens no período
     adiantado_aberto: float       # Σ adiantamentos "aberto" (TOTAL, posição atual)
+    despesas_periodo: float       # Σ despesas no período
+
+
+# ----- Despesas -----
+
+class DespesaCreate(BaseModel):
+    data: date
+    valor: float
+    categoria: str  # deslocamento/alimentacao/material/outros
+    descricao: str | None = None
+    maquina_id: int | None = None
+
+
+class DespesaUpdate(BaseModel):
+    data: date | None = None
+    valor: float | None = None
+    categoria: str | None = None
+    descricao: str | None = None
+    maquina_id: int | None = None
+
+
+class DespesaOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    data: date
+    valor: float
+    categoria: str
+    descricao: str | None
+    maquina_id: int | None
+    maquina_nome: str | None
+
+
+# ----- Resultado do período (ganho real) -----
+
+class ResultadoOut(BaseModel):
+    periodo_de: date
+    periodo_ate: date
+    total_entradas: float   # recebimentos (adiantamentos + fechamentos) no período
+    total_bolso: float      # diárias pagas do bolso no período
+    total_despesas: float   # despesas no período
+    total_saidas: float     # bolso + despesas
+    resultado: float        # entradas − saídas
 
 
 class PagamentoOut(BaseModel):

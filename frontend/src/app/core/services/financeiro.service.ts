@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { ApiService } from '../api.service';
-import { FinanceiroTotais, Pagamento, Recebimento, RepasseEntrada } from '../models';
+import { Despesa, FinanceiroTotais, Pagamento, Recebimento, RepasseEntrada } from '../models';
 
 export interface RecebimentoPayload {
   data?: string;
@@ -61,6 +61,35 @@ export class FinanceiroService {
 
   excluirRepasse(id: number): Observable<void> {
     return this.api.delete<void>(`/repasses/${id}`);
+  }
+
+  // ---- despesas ----
+
+  despesas(f: {
+    de?: string;
+    ate?: string;
+    categoria?: string;
+    maquina_id?: number;
+  }): Observable<Despesa[]> {
+    return this.api.get<Despesa[]>('/despesas', f);
+  }
+
+  criarDespesa(dados: {
+    data: string;
+    valor: number;
+    categoria: string;
+    descricao?: string | null;
+    maquina_id?: number | null;
+  }): Observable<Despesa> {
+    return this.api.post<Despesa>('/despesas', dados);
+  }
+
+  atualizarDespesa(id: number, dados: object): Observable<Despesa> {
+    return this.api.put<Despesa>(`/despesas/${id}`, dados);
+  }
+
+  excluirDespesa(id: number): Observable<void> {
+    return this.api.delete<void>(`/despesas/${id}`);
   }
 
   // ---- agregados ----

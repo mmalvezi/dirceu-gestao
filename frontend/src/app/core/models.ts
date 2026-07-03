@@ -58,7 +58,8 @@ export interface Trabalho {
   ajudante_nome: string;
   horas: number;
   valor: number;
-  origem: Origem;
+  origem: Origem | 'proprio';
+  proprio: boolean; // "Eu trabalhei": Dirceu, só horas (remuneração = empreita)
 }
 
 export interface DiarioEntrada {
@@ -116,6 +117,19 @@ export interface FinanceiroTotais {
   pago_epr_direto: number;
   custo_total_ajudantes: number;
   adiantado_aberto: number;
+  despesas_periodo: number;
+}
+
+export type DespesaCategoria = 'deslocamento' | 'alimentacao' | 'material' | 'outros';
+
+export interface Despesa {
+  id: number;
+  data: string;
+  valor: number;
+  categoria: DespesaCategoria;
+  descricao: string | null;
+  maquina_id: number | null;
+  maquina_nome: string | null;
 }
 
 // ----- Fechamento -----

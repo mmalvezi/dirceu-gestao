@@ -10,7 +10,7 @@ import { MaquinaService } from '../../core/services/maquina.service';
 import { formatDate, primeiroDiaMesIso, todayIso } from '../../core/format';
 import { Modal } from '../../shared/modal';
 
-type TipoRel = 'maquina' | 'periodo' | 'ajudantes' | 'entradas' | 'fechamento';
+type TipoRel = 'maquina' | 'periodo' | 'ajudantes' | 'entradas' | 'fechamento' | 'resultado';
 
 interface CardRel {
   tipo: TipoRel;
@@ -38,6 +38,7 @@ export class RelatoriosPage implements OnInit {
     { tipo: 'ajudantes', titulo: 'Saídas — ajudantes', desc: 'Quanto cada ajudante recebeu, com a origem de cada pagamento.' },
     { tipo: 'entradas', titulo: 'Entradas — recebimentos', desc: 'Adiantamentos e fechamentos recebidos da EPR.' },
     { tipo: 'fechamento', titulo: 'Fechamento', desc: 'O confronto: finalizado no período × adiantado. Pronto pra apresentar.' },
+    { tipo: 'resultado', titulo: 'Resultado do período', desc: 'Quanto realmente entrou × o que saiu do bolso. Seu ganho real.' },
   ];
 
   maquinas = signal<Maquina[]>([]);
@@ -96,6 +97,10 @@ export class RelatoriosPage implements OnInit {
         break;
       case 'entradas':
         caminho = '/pdf/entradas';
+        params = { de: this.rDe, ate: this.rAte };
+        break;
+      case 'resultado':
+        caminho = '/pdf/resultado';
         params = { de: this.rDe, ate: this.rAte };
         break;
       case 'fechamento':

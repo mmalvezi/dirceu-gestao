@@ -4,13 +4,20 @@ from calendar import monthrange
 from datetime import date
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends
-from sqlalchemy import func
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import false, func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import DiarioEntrada, DiarioTrabalho, Maquina, Recebimento, RepasseEntrada
-from app.schemas import FinanceiroTotais, PagamentoOut
+from app.models import (
+    Despesa,
+    DiarioEntrada,
+    DiarioTrabalho,
+    Maquina,
+    Recebimento,
+    RepasseEntrada,
+)
+from app.schemas import FinanceiroTotais, PagamentoOut, ResultadoOut
 from app.security import get_current_user
 
 router = APIRouter(
@@ -49,7 +56,11 @@ def pagamentos(
         db.query(DiarioTrabalho, DiarioEntrada.data, Maquina.id, Maquina.nome)
         .join(DiarioEntrada, DiarioTrabalho.entrada_id == DiarioEntrada.id)
         .join(Maquina, DiarioEntrada.maquina_id == Maquina.id)
-        .filter(DiarioEntrada.data >= de, DiarioEntrada.data <= ate)
+        .filter(
+            DiarioEntrada.data >= de,
+            DiarioEntrada.data <= ate,
+            DiarioTrabalho.proprio == false(),  # horas do Dirceu não são pagamento
+        )
     )
     if ajudante_id is not None:
         query = query.filter(DiarioTrabalho.ajudante_id == ajudante_id)
@@ -126,6 +137,12 @@ def totais(
         .scalar()
     )
 
+    despesas_periodo = _dec(
+        db.query(func.coalesce(func.sum(Despesa.valor), 0))
+        .filter(Despesa.data >= de, Despesa.data <= ate)
+        .scalar()
+    )
+
     return FinanceiroTotais(
         periodo_de=de,
         periodo_ate=ate,
@@ -136,4 +153,46 @@ def totais(
         pago_epr_direto=float(pago_epr_direto),
         custo_total_ajudantes=float(custo_total),
         adiantado_aberto=float(adiantado_aberto),
+        despesas_periodo=float(despesas_periodo),
+    )
+
+
+@router.get("/resultado", response_model=ResultadoOut)
+def resultado(de: date, ate: date, db: Session = Depends(get_db)) -> ResultadoOut:
+    """Resultado do período (ganho real): entradas − (bolso + despesas).
+
+    Repasse e EPR direto ficam FORA — não são dinheiro do Dirceu.
+    """
+    if de > ate:
+        raise HTTPException(status_code=422, detail="Período inválido: 'de' deve ser <= 'ate'.")
+
+    total_entradas = _dec(
+        db.query(func.coalesce(func.sum(Recebimento.valor), 0))
+        .filter(Recebimento.data >= de, Recebimento.data <= ate)
+        .scalar()
+    )
+    total_bolso = _dec(
+        db.query(func.coalesce(func.sum(DiarioTrabalho.valor), 0))
+        .join(DiarioEntrada, DiarioTrabalho.entrada_id == DiarioEntrada.id)
+        .filter(
+            DiarioTrabalho.origem == "bolso",
+            DiarioEntrada.data >= de,
+            DiarioEntrada.data <= ate,
+        )
+        .scalar()
+    )
+    total_despesas = _dec(
+        db.query(func.coalesce(func.sum(Despesa.valor), 0))
+        .filter(Despesa.data >= de, Despesa.data <= ate)
+        .scalar()
+    )
+    total_saidas = total_bolso + total_despesas
+    return ResultadoOut(
+        periodo_de=de,
+        periodo_ate=ate,
+        total_entradas=float(total_entradas),
+        total_bolso=float(total_bolso),
+        total_despesas=float(total_despesas),
+        total_saidas=float(total_saidas),
+        resultado=float(total_entradas - total_saidas),
     )

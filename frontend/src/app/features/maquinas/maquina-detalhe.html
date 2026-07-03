@@ -1,8 +1,5 @@
 <section class="screen">
-  <a class="back" routerLink="/maquinas">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="16" height="16"><path d="M15 5l-7 7 7 7"/></svg>
-    Máquinas
-  </a>
+  <app-voltar rotulo="Máquinas" fallback="/maquinas" />
 
   @if (aviso()) {
     <div class="alert a-warn"><app-icon name="alert" /><div>{{ aviso() }}</div></div>
@@ -68,7 +65,9 @@
             <div><span class="nm">{{ t.ajudante_nome }}</span> <span class="hs">· {{ fmtHoras(t.horas) }}h</span></div>
             <div class="right">
               <span class="chip {{ chip[t.origem][1] }}">{{ chip[t.origem][0] }}</span>
-              <span class="val">{{ fmtMoney(t.valor) }}</span>
+              @if (!t.proprio) {
+                <span class="val">{{ fmtMoney(t.valor) }}</span>
+              }
             </div>
           </div>
         }

@@ -1,5 +1,5 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 import { FabService } from '../../core/fab.service';
@@ -8,13 +8,14 @@ import { ORIGEM_CHIP, STATUS_BADGE, barClass } from '../../core/labels';
 import { DiarioEntrada, MaquinaDetalhe } from '../../core/models';
 import { MaquinaService } from '../../core/services/maquina.service';
 import { formatDateDia, formatHours, formatMoney } from '../../core/format';
+import { Voltar } from '../../shared/voltar';
 import { LancarDia } from './lancar-dia';
 import { MaquinaForm } from './maquina-form';
 
 /** Detalhe da máquina com diário de obra (scrMaquina do protótipo). */
 @Component({
   selector: 'app-maquina-detalhe',
-  imports: [RouterLink, Icon, LancarDia, MaquinaForm],
+  imports: [Icon, LancarDia, MaquinaForm, Voltar],
   templateUrl: './maquina-detalhe.html',
 })
 export class MaquinaDetalhePage implements OnInit {

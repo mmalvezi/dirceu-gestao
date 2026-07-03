@@ -46,11 +46,19 @@ CHIP = {
     "pocket": (POCKET_RED, POCKET_SOFT),
     "warn": (WARN, WARN_SOFT),
     "in": (IN_GREEN, IN_SOFT),
+    "neutral": (SLATE, SURF2),
 }
 ORIGEM_CHIP = {
     "repasse": ("Repasse EPR", "pass"),
     "epr_direto": ("EPR direto", "pass"),
     "bolso": ("Do bolso", "pocket"),
+    "proprio": ("Empreita", "neutral"),  # "Eu trabalhei" (Dirceu, sem valor)
+}
+CATEGORIA_LABEL = {
+    "deslocamento": "Deslocamento",
+    "alimentacao": "Alimentação",
+    "material": "Material",
+    "outros": "Outros",
 }
 STATUS_LABEL = {"andamento": "Em andamento", "finalizada": "Finalizada", "fechada": "Fechada"}
 
@@ -180,12 +188,12 @@ def _chip(pdf: DirceuPDF, x: float, y: float, texto: str, estilo: str, h: float 
     return w
 
 
-def _total_box(pdf: DirceuPDF, rotulo: str, valor_txt: str, h: float = 13):
+def _total_box(pdf: DirceuPDF, rotulo: str, valor_txt: str, h: float = 13, cor=IRON):
     """Caixa escura de total: rótulo à esquerda, valor grande mono à direita."""
     pdf.quebra_se_preciso(h + 4)
     pdf.ln(1.5)
     y = pdf.get_y()
-    pdf.set_fill_color(*IRON)
+    pdf.set_fill_color(*cor)
     pdf.rect(MARGIN, y, CONTENT_W, h, style="F", round_corners=True, corner_radius=2)
     pdf._losango(MARGIN + 6, y + h / 2, 1.6)
     pdf.set_text_color(255, 255, 255)
@@ -306,9 +314,11 @@ def pdf_maquina(config, maquina, entradas, custo, horas, margem, pct) -> DirceuP
             pdf.cell(16, 5, L(f"{horas_fmt(t.horas)}h"), align="R")
             rotulo, estilo = ORIGEM_CHIP.get(t.origem, (t.origem, "pass"))
             _chip(pdf, MARGIN + 84, y + 0.2, rotulo, estilo)
-            pdf.set_font("courier", "", 9)
-            pdf.set_xy(PAGE_W - MARGIN - 30, y)
-            pdf.cell(30, 5, L(f"R$ {moeda(t.valor)}"), align="R")
+            if not getattr(t, "proprio", False):
+                # trabalho próprio (Dirceu) tem só horas — sem valor
+                pdf.set_font("courier", "", 9)
+                pdf.set_xy(PAGE_W - MARGIN - 30, y)
+                pdf.cell(30, 5, L(f"R$ {moeda(t.valor)}"), align="R")
             pdf.set_y(y + 5.4)
         pdf.ln(1)
         _linha_fina(pdf)
@@ -651,4 +661,179 @@ def pdf_fechamento(config, numero, sub, maquinas, adiantamentos,
         pdf.set_text_color(*SLATE)
         pdf.multi_cell(CONTENT_W, 4.5, L(obs))
         pdf.set_text_color(*INK)
+    return pdf
+
+
+# ==================== 6) Resultado do período (ganho real) ====================
+
+def pdf_resultado(config, de, ate, recebimentos, total_entradas,
+                  bolso_rows, total_bolso, despesas, total_despesas,
+                  total_saidas, resultado) -> DirceuPDF:
+    """Confronto entradas × saídas do bolso. bolso_rows: (data, ajudante, maquina, valor)."""
+    label = f"{data_curta(de)} a {data_curta(ate)}"
+    pdf = DirceuPDF(config, "Resultado do período", label, rodape_id=f"Período {label}")
+
+    # ---- Bloco 1: entradas ----
+    _sec(pdf, "Entradas — recebido no período")
+    if not recebimentos:
+        _nada(pdf, "Nenhum recebimento no período.")
+    else:
+        cols = [("Data", 24, "L"), ("Tipo", 32, "L"), ("Máquina", 88, "L"), ("Valor", 38, "R")]
+        _tab_header(pdf, cols)
+        for r in recebimentos:
+            pdf.quebra_se_preciso(7)
+            y = pdf.get_y()
+            pdf.set_font("courier", "", 8.5)
+            pdf.set_xy(MARGIN, y)
+            pdf.cell(24, 5.5, L(data_br(r.data)))
+            pdf.set_font("helvetica", "", 8.5)
+            pdf.set_xy(MARGIN + 24, y)
+            pdf.cell(32, 5.5, L("Adiantamento" if r.tipo == "adiantamento" else "Fechamento"))
+            pdf.set_xy(MARGIN + 56, y)
+            pdf.cell(88, 5.5, L(r.maquina_nome or "-"))
+            pdf.set_font("courier", "", 9)
+            pdf.set_text_color(*IN_GREEN)
+            pdf.set_xy(MARGIN + 144, y)
+            pdf.cell(38, 5.5, L(f"R$ {moeda(r.valor)}"), align="R")
+            pdf.set_text_color(*INK)
+            pdf.set_y(y + 6)
+            _linha_fina(pdf)
+    y = pdf.get_y()
+    pdf.set_font("helvetica", "B", 8)
+    pdf.set_xy(MARGIN, y)
+    pdf.cell(120, 6, L("TOTAL DE ENTRADAS"))
+    pdf.set_font("courier", "B", 9.5)
+    pdf.set_text_color(*IN_GREEN)
+    pdf.set_xy(MARGIN + 144, y)
+    pdf.cell(38, 6, L(f"R$ {moeda(total_entradas)}"), align="R")
+    pdf.set_text_color(*INK)
+    pdf.set_y(y + 7)
+
+    # ---- Bloco 2: saídas do bolso ----
+    _sec(pdf, "Saídas do bolso")
+    pdf.set_font("helvetica", "B", 8)
+    pdf.set_text_color(*SLATE)
+    pdf.cell(0, 5, L("Diárias pagas do bolso"), new_x="LMARGIN", new_y="NEXT")
+    pdf.set_text_color(*INK)
+    if not bolso_rows:
+        _nada(pdf, "Nenhuma diária do bolso no período.")
+    else:
+        cols = [("Data", 24, "L"), ("Ajudante", 56, "L"), ("Máquina", 64, "L"), ("Valor", 38, "R")]
+        _tab_header(pdf, cols)
+        for data_e, ajudante, maquina, valor in bolso_rows:
+            pdf.quebra_se_preciso(7)
+            y = pdf.get_y()
+            pdf.set_font("courier", "", 8.5)
+            pdf.set_xy(MARGIN, y)
+            pdf.cell(24, 5.5, L(data_br(data_e)))
+            pdf.set_font("helvetica", "", 8.5)
+            pdf.set_xy(MARGIN + 24, y)
+            pdf.cell(56, 5.5, L(ajudante))
+            pdf.set_xy(MARGIN + 80, y)
+            pdf.cell(64, 5.5, L(maquina))
+            pdf.set_font("courier", "", 9)
+            pdf.set_text_color(*POCKET_RED)
+            pdf.set_xy(MARGIN + 144, y)
+            pdf.cell(38, 5.5, L(f"- R$ {moeda(valor)}"), align="R")
+            pdf.set_text_color(*INK)
+            pdf.set_y(y + 6)
+            _linha_fina(pdf)
+        y = pdf.get_y()
+        pdf.set_font("helvetica", "B", 8)
+        pdf.set_xy(MARGIN, y)
+        pdf.cell(120, 6, L("Subtotal diárias do bolso"))
+        pdf.set_font("courier", "B", 9)
+        pdf.set_text_color(*POCKET_RED)
+        pdf.set_xy(MARGIN + 144, y)
+        pdf.cell(38, 6, L(f"- R$ {moeda(total_bolso)}"), align="R")
+        pdf.set_text_color(*INK)
+        pdf.set_y(y + 7)
+
+    pdf.ln(1)
+    pdf.set_font("helvetica", "B", 8)
+    pdf.set_text_color(*SLATE)
+    pdf.cell(0, 5, L("Despesas"), new_x="LMARGIN", new_y="NEXT")
+    pdf.set_text_color(*INK)
+    if not despesas:
+        _nada(pdf, "Nenhuma despesa no período.")
+    else:
+        cols = [("Data", 24, "L"), ("Categoria", 34, "L"), ("Descrição", 86, "L"), ("Valor", 38, "R")]
+        _tab_header(pdf, cols)
+        for d in despesas:
+            pdf.quebra_se_preciso(7)
+            y = pdf.get_y()
+            pdf.set_font("courier", "", 8.5)
+            pdf.set_xy(MARGIN, y)
+            pdf.cell(24, 5.5, L(data_br(d.data)))
+            pdf.set_font("helvetica", "", 8.5)
+            pdf.set_xy(MARGIN + 24, y)
+            pdf.cell(34, 5.5, L(CATEGORIA_LABEL.get(d.categoria, d.categoria)))
+            pdf.set_xy(MARGIN + 58, y)
+            desc = d.descricao or "-"
+            if d.maquina_nome:
+                desc = f"{desc} ({d.maquina_nome})" if d.descricao else d.maquina_nome
+            pdf.cell(86, 5.5, L(desc[:52]))
+            pdf.set_font("courier", "", 9)
+            pdf.set_text_color(*POCKET_RED)
+            pdf.set_xy(MARGIN + 144, y)
+            pdf.cell(38, 5.5, L(f"- R$ {moeda(d.valor)}"), align="R")
+            pdf.set_text_color(*INK)
+            pdf.set_y(y + 6)
+            _linha_fina(pdf)
+        y = pdf.get_y()
+        pdf.set_font("helvetica", "B", 8)
+        pdf.set_xy(MARGIN, y)
+        pdf.cell(120, 6, L("Subtotal despesas"))
+        pdf.set_font("courier", "B", 9)
+        pdf.set_text_color(*POCKET_RED)
+        pdf.set_xy(MARGIN + 144, y)
+        pdf.cell(38, 6, L(f"- R$ {moeda(total_despesas)}"), align="R")
+        pdf.set_text_color(*INK)
+        pdf.set_y(y + 7)
+
+    y = pdf.get_y()
+    pdf.set_font("helvetica", "B", 8.5)
+    pdf.set_xy(MARGIN, y)
+    pdf.cell(120, 6, L("TOTAL DE SAÍDAS"))
+    pdf.set_font("courier", "B", 9.5)
+    pdf.set_text_color(*POCKET_RED)
+    pdf.set_xy(MARGIN + 144, y)
+    pdf.cell(38, 6, L(f"- R$ {moeda(total_saidas)}"), align="R")
+    pdf.set_text_color(*INK)
+    pdf.set_y(y + 8)
+
+    # ---- Barra entradas × saídas (proporcional) ----
+    soma = float(total_entradas) + float(total_saidas)
+    if soma > 0:
+        pdf.quebra_se_preciso(16)
+        y = pdf.get_y()
+        h = 7
+        w_ent = CONTENT_W * float(total_entradas) / soma
+        pdf.set_fill_color(*IN_GREEN)
+        if w_ent > 0.5:
+            pdf.rect(MARGIN, y, w_ent, h, style="F", round_corners=True, corner_radius=1.5)
+        pdf.set_fill_color(*POCKET_RED)
+        if CONTENT_W - w_ent > 0.5:
+            pdf.rect(MARGIN + w_ent, y, CONTENT_W - w_ent, h, style="F",
+                     round_corners=True, corner_radius=1.5)
+        ly = y + h + 2
+        pdf.set_font("helvetica", "", 7.5)
+        pdf.set_text_color(*SLATE)
+        pdf.set_xy(MARGIN, ly)
+        pdf.cell(90, 4.5, L(f"Entradas: R$ {moeda(total_entradas)}"))
+        pdf.set_xy(PAGE_W - MARGIN - 90, ly)
+        pdf.cell(90, 4.5, L(f"Saídas: R$ {moeda(total_saidas)}"), align="R")
+        pdf.set_text_color(*INK)
+        pdf.set_y(ly + 7)
+
+    # ---- Resultado (verde/vermelho) ----
+    cor = IN_GREEN if resultado >= 0 else POCKET_RED
+    _total_box(pdf, "Resultado do período", f"R$ {moeda(resultado)}", cor=cor)
+    pdf.set_font("helvetica", "", 8.5)
+    pdf.set_text_color(*SLATE)
+    pdf.cell(0, 5, L(f"Entradas R$ {moeda(total_entradas)} - Saídas R$ {moeda(total_saidas)}"),
+             new_x="LMARGIN", new_y="NEXT")
+    pdf.set_text_color(*INK)
+    _nota(pdf, "Repasses da EPR e pagamentos diretos da EPR não entram: "
+               "não são receita nem custo do Dirceu.")
     return pdf

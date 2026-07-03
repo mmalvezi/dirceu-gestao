@@ -7,10 +7,18 @@ export const STATUS_BADGE: Record<MaquinaStatus, [string, string]> = {
   fechada: ['Fechada e recebida', 'b-fech'],
 };
 
-export const ORIGEM_CHIP: Record<Origem, [string, string]> = {
+export const ORIGEM_CHIP: Record<Origem | 'proprio', [string, string]> = {
   repasse: ['Repasse EPR', 'c-rep'],
   epr_direto: ['EPR direto', 'c-epr'],
   bolso: ['Do bolso', 'c-bolso'],
+  proprio: ['Empreita', 'c-neutral'], // "Eu trabalhei" — sem valor
+};
+
+export const CATEGORIA_DESPESA: Record<string, string> = {
+  deslocamento: 'Deslocamento',
+  alimentacao: 'Alimentação',
+  material: 'Material',
+  outros: 'Outros',
 };
 
 /** Classe da barra de consumo (protótipo: >70 hot, >45 padrão, senão ok). */

@@ -76,7 +76,9 @@ Sistema de gestão para o **Dirceu**, prestador PJ de caldeiraria e solda que ge
 
 **diario_entradas** — id, maquina_id (FK CASCADE), data (date), descricao (texto)
 
-**diario_trabalhos** — id, entrada_id (FK CASCADE), ajudante_id (FK SET NULL), ajudante_nome (snapshot), horas (num), valor (num), origem (`repasse`/`epr_direto`/`bolso`)
+**diario_trabalhos** — id, entrada_id (FK CASCADE), ajudante_id (FK SET NULL), ajudante_nome (snapshot), horas (num), valor (num), origem (`repasse`/`epr_direto`/`bolso`/`proprio`), proprio (bool, default false — "eu trabalhei": horas do Dirceu, valor 0, remuneração é a empreita; conta nas horas, não nos custos/pagamentos)
+
+**despesas** — id, data (date), valor (num), categoria (`deslocamento`/`alimentacao`/`material`/`outros`), descricao (opc), maquina_id (FK SET NULL, opc), maquina_nome (snapshot, opc) — gastos do próprio Dirceu; entram no "resultado do período"
 
 **recebimentos** — id, tipo (`adiantamento`/`fechamento`), data (date), valor (num), maquina_id (FK SET NULL, opc), maquina_nome (snapshot, opc), status (`aberto`/`quitado` — só relevante p/ adiantamento; fechamento nasce `quitado`), fechamento_id (FK null, SET NULL), obs (opc)
 
@@ -97,10 +99,14 @@ Sistema de gestão para o **Dirceu**, prestador PJ de caldeiraria e solda que ge
 - `POST/PUT/DELETE /maquinas/{id}/diario` (entrada com lista de trabalhos aninhada; PUT substitui os trabalhos da entrada)
 - `GET/POST/PUT/DELETE /recebimentos` (filtros `?tipo=&status=&de=&ate=`)
 - `GET/POST/PUT/DELETE /repasses` (verbas de repasse)
+- `GET/POST/PUT/DELETE /despesas` (filtros `?de=&ate=&categoria=&maquina_id=`)
+- `GET /financeiro/pagamentos?de=&ate=[&ajudante_id=][&origem=]` (lista "pagos a ajudantes"; exclui trabalhos próprios)
+- `GET /financeiro/totais?de=&ate=` (origens + caixa de repasse + adiantado aberto + despesas_periodo)
+- `GET /financeiro/resultado?de=&ate=` (ganho real: recebimentos − bolso − despesas)
 - `GET /fechamentos/previa?de=&ate=` (calcula sem gravar: máquinas finalizadas no período + adiantamentos abertos vinculados + saldo)
 - `POST /fechamentos` (registra o acerto: efetiva status/quitações, gera número, cria recebimento tipo fechamento) · `GET /fechamentos` (histórico)
 - `GET /dashboard` (KPIs, horas por dia da semana, margens, avisos, texto do resumo WhatsApp)
-- PDFs: `GET /pdf/maquina/{id}`, `GET /pdf/periodo?de=&ate=`, `GET /pdf/ajudantes?de=&ate=[&ajudante_id=]`, `GET /pdf/entradas?de=&ate=`, `GET /pdf/fechamento/{id}` (e `GET /pdf/fechamento-previa?de=&ate=`)
+- PDFs: `GET /pdf/maquina/{id}`, `GET /pdf/periodo?de=&ate=`, `GET /pdf/ajudantes?de=&ate=[&ajudante_id=]`, `GET /pdf/entradas?de=&ate=`, `GET /pdf/resultado?de=&ate=` (ganho real do período), `GET /pdf/fechamento/{id}` (e `GET /pdf/fechamento-previa?de=&ate=`)
 
 ---
 

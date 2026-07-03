@@ -1,6 +1,6 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 
 import { Icon } from '../../core/icon';
 import { Aviso, Dashboard } from '../../core/models';
@@ -15,7 +15,7 @@ import {
 /** Início (scrInicio do protótipo): KPIs, avisos acionáveis, horas, margens e resumo. */
 @Component({
   selector: 'app-inicio',
-  imports: [FormsModule, Icon],
+  imports: [FormsModule, Icon, RouterLink],
   templateUrl: './inicio.html',
 })
 export class InicioPage implements OnInit {

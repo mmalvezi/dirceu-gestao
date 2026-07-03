@@ -4,13 +4,14 @@ from datetime import date
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Response
-from sqlalchemy import func
+from sqlalchemy import false, func
 from sqlalchemy.orm import Session, selectinload
 
 from app.calc import agregados_por_maquina, calcular_margem_pct
 from app.database import get_db
 from app.models import (
     Ajudante,
+    Despesa,
     DiarioEntrada,
     DiarioTrabalho,
     Fechamento,
@@ -24,6 +25,7 @@ from app.pdf import (
     pdf_fechamento,
     pdf_maquina,
     pdf_periodo,
+    pdf_resultado,
     slug,
 )
 from app.routers.config import get_config
@@ -133,7 +135,11 @@ def rel_ajudantes(
         db.query(DiarioTrabalho, DiarioEntrada.data, Maquina.nome)
         .join(DiarioEntrada, DiarioTrabalho.entrada_id == DiarioEntrada.id)
         .join(Maquina, DiarioEntrada.maquina_id == Maquina.id)
-        .filter(DiarioEntrada.data >= de, DiarioEntrada.data <= ate)
+        .filter(
+            DiarioEntrada.data >= de,
+            DiarioEntrada.data <= ate,
+            DiarioTrabalho.proprio == false(),  # horas próprias não são saída
+        )
     )
     if ajudante_id is not None:
         query = query.filter(DiarioTrabalho.ajudante_id == ajudante_id)
@@ -182,7 +188,53 @@ def rel_entradas(de: date, ate: date, db: Session = Depends(get_db)) -> Response
     return _resp(pdf, f"entradas-{de.isoformat()}-a-{ate.isoformat()}.pdf")
 
 
-# -------- 5) fechamento (registrado) e prévia --------
+# -------- 5) resultado do período (ganho real) --------
+
+@router.get("/resultado")
+def rel_resultado(de: date, ate: date, db: Session = Depends(get_db)) -> Response:
+    _periodo_ok(de, ate)
+    recebimentos = (
+        db.query(Recebimento)
+        .filter(Recebimento.data >= de, Recebimento.data <= ate)
+        .order_by(Recebimento.data.asc(), Recebimento.id.asc())
+        .all()
+    )
+    total_entradas = sum((_dec(r.valor) for r in recebimentos), Decimal("0"))
+
+    bolso_q = (
+        db.query(DiarioEntrada.data, DiarioTrabalho.ajudante_nome, Maquina.nome, DiarioTrabalho.valor)
+        .join(DiarioTrabalho, DiarioTrabalho.entrada_id == DiarioEntrada.id)
+        .join(Maquina, DiarioEntrada.maquina_id == Maquina.id)
+        .filter(
+            DiarioTrabalho.origem == "bolso",
+            DiarioEntrada.data >= de,
+            DiarioEntrada.data <= ate,
+        )
+        .order_by(DiarioEntrada.data.asc(), DiarioTrabalho.id.asc())
+        .all()
+    )
+    total_bolso = sum((_dec(v) for _, _, _, v in bolso_q), Decimal("0"))
+
+    despesas = (
+        db.query(Despesa)
+        .filter(Despesa.data >= de, Despesa.data <= ate)
+        .order_by(Despesa.data.asc(), Despesa.id.asc())
+        .all()
+    )
+    total_despesas = sum((_dec(d.valor) for d in despesas), Decimal("0"))
+    total_saidas = total_bolso + total_despesas
+
+    pdf = pdf_resultado(
+        get_config(db), de, ate,
+        recebimentos, total_entradas,
+        bolso_q, total_bolso,
+        despesas, total_despesas,
+        total_saidas, float(total_entradas - total_saidas),
+    )
+    return _resp(pdf, f"resultado-{de.isoformat()}-a-{ate.isoformat()}.pdf")
+
+
+# -------- 6) fechamento (registrado) e prévia --------
 
 @router.get("/fechamento-previa")
 def rel_fechamento_previa(de: date, ate: date, db: Session = Depends(get_db)) -> Response:

@@ -5,8 +5,9 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 import { Icon } from '../../core/icon';
-import { ORIGEM_CHIP } from '../../core/labels';
+import { CATEGORIA_DESPESA, ORIGEM_CHIP } from '../../core/labels';
 import {
+  Despesa,
   FinanceiroTotais,
   Maquina,
   Pagamento,
@@ -18,7 +19,9 @@ import { MaquinaService } from '../../core/services/maquina.service';
 import { formatDate, formatHours, formatMoney, primeiroDiaMesIso, todayIso } from '../../core/format';
 import { Modal } from '../../shared/modal';
 
-type Aba = 'receb' | 'pagto' | 'acerto';
+type Aba = 'receb' | 'pagto' | 'acerto' | 'despesas';
+
+const ABAS: Aba[] = ['receb', 'pagto', 'acerto', 'despesas'];
 
 /** Financeiro com 3 abas (scrFinanceiro do protótipo). Aba na URL (?aba=). */
 @Component({
@@ -36,6 +39,8 @@ export class FinanceiroPage implements OnInit {
   fmtData = formatDate;
   fmtHoras = formatHours;
   chip = ORIGEM_CHIP;
+  catLabel = CATEGORIA_DESPESA;
+  CATEGORIAS = Object.entries(CATEGORIA_DESPESA); // [chave, rótulo]
 
   aba = signal<Aba>('receb');
   de = primeiroDiaMesIso();
@@ -50,6 +55,19 @@ export class FinanceiroPage implements OnInit {
   // Acerto & origens
   totais = signal<FinanceiroTotais | null>(null);
   verbas = signal<RepasseEntrada[]>([]);
+  // Despesas
+  categoriaFiltro = '';
+  despesas = signal<Despesa[]>([]);
+
+  // Modal despesa
+  dpAberto = signal(false);
+  dpEdit: Despesa | null = null;
+  dpData = todayIso();
+  dpValor: string | number | null = '';
+  dpCategoria = 'deslocamento';
+  dpDescricao = '';
+  dpMaquinaId = '';
+  dpErro = signal('');
 
   // Modal adiantamento
   adAberto = signal(false);
@@ -72,7 +90,7 @@ export class FinanceiroPage implements OnInit {
   constructor() {
     this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((qp) => {
       const aba = qp.get('aba') as Aba | null;
-      if (aba && ['receb', 'pagto', 'acerto'].includes(aba) && aba !== this.aba()) {
+      if (aba && ABAS.includes(aba) && aba !== this.aba()) {
         this.aba.set(aba);
         this.recarregar();
       }
@@ -81,7 +99,7 @@ export class FinanceiroPage implements OnInit {
 
   ngOnInit(): void {
     const aba = this.route.snapshot.queryParamMap.get('aba') as Aba | null;
-    if (aba && ['receb', 'pagto', 'acerto'].includes(aba)) this.aba.set(aba);
+    if (aba && ABAS.includes(aba)) this.aba.set(aba);
     this.recarregar();
     this.maquinasSvc.listar().subscribe((ms) =>
       this.maquinasAbertas.set(ms.filter((m) => m.status !== 'fechada')),
@@ -104,10 +122,60 @@ export class FinanceiroPage implements OnInit {
       this.svc
         .pagamentos({ de: this.de, ate: this.ate, origem: this.origemFiltro || undefined })
         .subscribe((p) => this.pagamentos.set(p));
+    } else if (a === 'despesas') {
+      this.svc
+        .despesas({ de: this.de, ate: this.ate, categoria: this.categoriaFiltro || undefined })
+        .subscribe((d) => this.despesas.set(d));
     } else {
       this.svc.totais(this.de, this.ate).subscribe((t) => this.totais.set(t));
       this.svc.repasses(this.de, this.ate).subscribe((v) => this.verbas.set(v));
     }
+  }
+
+  // ---- modal despesa ----
+
+  abrirDespesa(d: Despesa | null): void {
+    this.dpEdit = d;
+    this.dpData = d?.data ?? todayIso();
+    this.dpValor = d ? d.valor : '';
+    this.dpCategoria = d?.categoria ?? 'deslocamento';
+    this.dpDescricao = d?.descricao ?? '';
+    this.dpMaquinaId = d?.maquina_id != null ? String(d.maquina_id) : '';
+    this.dpErro.set('');
+    this.dpAberto.set(true);
+  }
+
+  salvarDespesa(): void {
+    const valor = Number(String(this.dpValor ?? '').trim());
+    if (!(valor > 0)) {
+      this.dpErro.set('Informe um valor maior que zero.');
+      return;
+    }
+    const dados = {
+      data: this.dpData,
+      valor,
+      categoria: this.dpCategoria,
+      descricao: this.dpDescricao.trim() || null,
+      maquina_id: this.dpMaquinaId ? Number(this.dpMaquinaId) : null,
+    };
+    const req = this.dpEdit
+      ? this.svc.atualizarDespesa(this.dpEdit.id, dados)
+      : this.svc.criarDespesa(dados);
+    req.subscribe({
+      next: () => {
+        this.dpAberto.set(false);
+        this.recarregar();
+      },
+      error: (e: HttpErrorResponse) => {
+        const d = e.error?.detail;
+        this.dpErro.set(typeof d === 'string' ? d : 'Não foi possível salvar.');
+      },
+    });
+  }
+
+  excluirDespesa(d: Despesa): void {
+    if (!confirm(`Excluir a despesa de ${formatMoney(d.valor)}?`)) return;
+    this.svc.excluirDespesa(d.id).subscribe(() => this.recarregar());
   }
 
   editavel(r: Recebimento): boolean {

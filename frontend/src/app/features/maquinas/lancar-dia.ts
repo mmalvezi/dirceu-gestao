@@ -18,6 +18,7 @@ interface Linha {
   valor: string | number | null;
   origem: Origem;
   valorManual: boolean; // usuário digitou o valor — não sobrescrever com sugestão
+  proprio: boolean; // "Eu trabalhei": Dirceu, só horas
 }
 
 /** Modal "Lançar dia" — o coração do sistema (cria/edita entrada do diário). */
@@ -59,17 +60,22 @@ export class LancarDia implements OnInit {
         this.data = e.data;
         this.descricao = e.descricao;
         this.linhas.set(
-          e.trabalhos.map((t) => ({
-            sel:
-              t.ajudante_id !== null && lista.some((a) => a.id === t.ajudante_id)
-                ? String(t.ajudante_id)
-                : 'outro',
-            nome: t.ajudante_nome,
-            horas: String(t.horas),
-            valor: String(t.valor),
-            origem: t.origem,
-            valorManual: true, // edição: preserva os valores gravados
-          })),
+          e.trabalhos.map((t) =>
+            t.proprio
+              ? { ...this.linhaPropria(), horas: String(t.horas) }
+              : {
+                  sel:
+                    t.ajudante_id !== null && lista.some((a) => a.id === t.ajudante_id)
+                      ? String(t.ajudante_id)
+                      : 'outro',
+                  nome: t.ajudante_nome,
+                  horas: String(t.horas),
+                  valor: String(t.valor),
+                  origem: t.origem as Origem,
+                  valorManual: true, // edição: preserva os valores gravados
+                  proprio: false,
+                },
+          ),
         );
       } else {
         this.linhas.set([this.novaLinha()]);
@@ -78,11 +84,25 @@ export class LancarDia implements OnInit {
   }
 
   private novaLinha(): Linha {
-    return { sel: '', nome: '', horas: '', valor: '', origem: 'repasse', valorManual: false };
+    return { sel: '', nome: '', horas: '', valor: '', origem: 'repasse', valorManual: false, proprio: false };
+  }
+
+  private linhaPropria(): Linha {
+    return { sel: 'proprio', nome: 'Dirceu', horas: '', valor: '0', origem: 'repasse', valorManual: true, proprio: true };
   }
 
   addLinha(): void {
     this.linhas.update((a) => [...a, this.novaLinha()]);
+  }
+
+  /** "+ Eu trabalhei": no máximo 1 linha própria por entrada. */
+  addProprio(): void {
+    if (this.temProprio()) return;
+    this.linhas.update((a) => [...a, this.linhaPropria()]);
+  }
+
+  temProprio(): boolean {
+    return this.linhas().some((l) => l.proprio);
   }
 
   removeLinha(i: number): void {
@@ -117,6 +137,14 @@ export class LancarDia implements OnInit {
       const valorStr = String(l.valor ?? '').trim();
       const horas = Number(l.horas);
       const valor = Number(valorStr);
+      if (l.proprio) {
+        if (!(horas > 0)) {
+          this.erro.set('Informe as suas horas trabalhadas.');
+          return;
+        }
+        trabalhos.push({ proprio: true, horas, valor: 0 });
+        continue;
+      }
       if (!l.sel) {
         this.erro.set('Escolha o ajudante em todas as linhas (ou "Outro").');
         return;

@@ -19,7 +19,8 @@ export interface TrabalhoPayload {
   ajudante_nome?: string | null;
   horas: number;
   valor: number;
-  origem: string;
+  origem?: string;
+  proprio?: boolean;
 }
 
 export interface EntradaPayload {

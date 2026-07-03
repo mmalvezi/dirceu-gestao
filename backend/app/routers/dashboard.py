@@ -6,7 +6,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import func
+from sqlalchemy import false, func
 from sqlalchemy.orm import Session
 
 from app.calc import agregados_por_maquina, calcular_margem_pct
@@ -82,7 +82,11 @@ def dashboard(
     ajudantes_ativos = (
         db.query(func.count(func.distinct(DiarioTrabalho.ajudante_nome)))
         .join(DiarioEntrada, DiarioTrabalho.entrada_id == DiarioEntrada.id)
-        .filter(DiarioEntrada.data >= de, DiarioEntrada.data <= ate)
+        .filter(
+            DiarioEntrada.data >= de,
+            DiarioEntrada.data <= ate,
+            DiarioTrabalho.proprio == false(),  # o Dirceu não conta como ajudante
+        )
         .scalar()
         or 0
     )
