@@ -91,7 +91,11 @@ class MaquinaOut(BaseModel):
     data_inicio: date
     data_finalizacao: date | None = None
     obs: str | None = None
-    custo: float
+    # Contabilidade do Dirceu: margem/pct usam SÓ o custo dele (bolso + despesas).
+    custo_dirceu: float
+    custo_bolso_diarias: float
+    custo_despesas: float
+    custo_epr: float  # repasse + EPR direto — informativo, fora da margem
     horas: float
     margem: float
     pct_consumido: int
@@ -376,7 +380,7 @@ class MaquinaAndamentoDash(BaseModel):
     nome: str
     status: str
     empreita: float
-    custo: float
+    custo_dirceu: float
     margem: float
     pct_consumido: int
 

@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import case, or_
 from sqlalchemy.orm import Session
 
-from app.calc import agregados_por_maquina, calcular_margem_pct, ultimos_por_maquina
+from app.calc import Agregados, agregados_por_maquina, calcular_margem_pct, ultimos_por_maquina
 from app.database import get_db
 from app.models import DiarioEntrada, Maquina, Recebimento
 from app.routers.diario import listar_diario
@@ -42,10 +42,9 @@ def _get_or_404(db: Session, maquina_id: int) -> Maquina:
     return maquina
 
 
-def _montar_out(
-    maquina: Maquina, custo: Decimal, horas: Decimal, ultimo: dict | None
-) -> MaquinaOut:
-    margem, pct = calcular_margem_pct(maquina.empreita, custo)
+def _montar_out(maquina: Maquina, ag: Agregados, ultimo: dict | None) -> MaquinaOut:
+    # Margem/pct pela contabilidade do DIRCEU: só bolso + despesas.
+    margem, pct = calcular_margem_pct(maquina.empreita, ag.custo_dirceu)
     return MaquinaOut(
         id=maquina.id,
         nome=maquina.nome,
@@ -55,8 +54,11 @@ def _montar_out(
         data_inicio=maquina.data_inicio,
         data_finalizacao=maquina.data_finalizacao,
         obs=maquina.obs,
-        custo=float(custo),
-        horas=float(horas),
+        custo_dirceu=float(ag.custo_dirceu),
+        custo_bolso_diarias=float(ag.bolso_diarias),
+        custo_despesas=float(ag.despesas),
+        custo_epr=float(ag.custo_epr),
+        horas=float(ag.horas),
         margem=float(margem),
         pct_consumido=pct,
         ultimo_lancamento=UltimoLancamento(**ultimo) if ultimo else None,
@@ -82,9 +84,8 @@ def listar(
     ids = [m.id for m in maquinas]
     agregados = agregados_por_maquina(db, ids)
     ultimos = ultimos_por_maquina(db, ids)
-    zero = (Decimal("0"), Decimal("0"))
     return [
-        _montar_out(m, *agregados.get(m.id, zero), ultimos.get(m.id))
+        _montar_out(m, agregados.get(m.id, Agregados()), ultimos.get(m.id))
         for m in maquinas
     ]
 
@@ -94,8 +95,7 @@ def detalhe(maquina_id: int, db: Session = Depends(get_db)) -> MaquinaDetalheOut
     maquina = _get_or_404(db, maquina_id)
     agregados = agregados_por_maquina(db, [maquina.id])
     ultimos = ultimos_por_maquina(db, [maquina.id])
-    custo, horas = agregados.get(maquina.id, (Decimal("0"), Decimal("0")))
-    base = _montar_out(maquina, custo, horas, ultimos.get(maquina.id))
+    base = _montar_out(maquina, agregados.get(maquina.id, Agregados()), ultimos.get(maquina.id))
     diario = listar_diario(db, maquina.id)
     return MaquinaDetalheOut(**base.model_dump(), diario=diario)
 
@@ -106,7 +106,7 @@ def criar(payload: MaquinaCreate, db: Session = Depends(get_db)) -> MaquinaOut:
     db.add(maquina)
     db.commit()
     db.refresh(maquina)
-    return _montar_out(maquina, Decimal("0"), Decimal("0"), None)
+    return _montar_out(maquina, Agregados(), None)
 
 
 @router.put("/{maquina_id}", response_model=MaquinaOut)
@@ -156,8 +156,7 @@ def atualizar(
 
     agregados = agregados_por_maquina(db, [maquina.id])
     ultimos = ultimos_por_maquina(db, [maquina.id])
-    custo, horas = agregados.get(maquina.id, (Decimal("0"), Decimal("0")))
-    return _montar_out(maquina, custo, horas, ultimos.get(maquina.id))
+    return _montar_out(maquina, agregados.get(maquina.id, Agregados()), ultimos.get(maquina.id))
 
 
 @router.delete("/{maquina_id}", status_code=status.HTTP_204_NO_CONTENT)

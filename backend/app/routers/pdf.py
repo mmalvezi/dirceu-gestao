@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy import false, func
 from sqlalchemy.orm import Session, selectinload
 
-from app.calc import agregados_por_maquina, calcular_margem_pct
+from app.calc import Agregados, agregados_por_maquina, calcular_margem_pct
 from app.database import get_db
 from app.models import (
     Ajudante,
@@ -68,11 +68,9 @@ def rel_maquina(maquina_id: int, db: Session = Depends(get_db)) -> Response:
         .order_by(DiarioEntrada.data.asc(), DiarioEntrada.id.asc())
         .all()
     )
-    custo, horas = agregados_por_maquina(db, [maquina_id]).get(
-        maquina_id, (Decimal("0"), Decimal("0"))
-    )
-    margem, pct = calcular_margem_pct(maquina.empreita, custo)
-    pdf = pdf_maquina(get_config(db), maquina, entradas, custo, horas, margem, pct)
+    ag = agregados_por_maquina(db, [maquina_id]).get(maquina_id, Agregados())
+    margem, pct = calcular_margem_pct(maquina.empreita, ag.custo_dirceu)
+    pdf = pdf_maquina(get_config(db), maquina, entradas, ag, margem, pct)
     return _resp(pdf, f"maquina-{slug(maquina.nome)}.pdf")
 
 
@@ -93,16 +91,31 @@ def rel_periodo(de: date, ate: date, db: Session = Depends(get_db)) -> Response:
         .group_by(DiarioEntrada.maquina_id, DiarioTrabalho.origem)
         .all()
     )
+    def novo_bloco():
+        return {"horas": Decimal("0"), "bolso": Decimal("0"), "despesas": Decimal("0"),
+                "epr": Decimal("0")}
+
     por_maquina: dict[int, dict] = {}
     for mid, origem, valor, horas in rows:
-        b = por_maquina.setdefault(
-            mid,
-            {"horas": Decimal("0"), "repasse": Decimal("0"), "bolso": Decimal("0"),
-             "epr_direto": Decimal("0"), "total": Decimal("0")},
-        )
-        b[origem] = b.get(origem, Decimal("0")) + _dec(valor)
+        b = por_maquina.setdefault(mid, novo_bloco())
         b["horas"] += _dec(horas)
-        b["total"] += _dec(valor)
+        if origem == "bolso":
+            b["bolso"] += _dec(valor)
+        elif origem in ("repasse", "epr_direto"):
+            b["epr"] += _dec(valor)  # pago pela EPR — fora da margem
+
+    # despesas vinculadas a máquinas no período também são atividade
+    desp_rows = (
+        db.query(Despesa.maquina_id, func.coalesce(func.sum(Despesa.valor), 0))
+        .filter(Despesa.maquina_id.isnot(None), Despesa.data >= de, Despesa.data <= ate)
+        .group_by(Despesa.maquina_id)
+        .all()
+    )
+    for mid, valor in desp_rows:
+        por_maquina.setdefault(mid, novo_bloco())["despesas"] += _dec(valor)
+
+    for b in por_maquina.values():
+        b["custo_dirceu"] = b["bolso"] + b["despesas"]
 
     maquinas = {
         m.id: m
@@ -110,12 +123,12 @@ def rel_periodo(de: date, ate: date, db: Session = Depends(get_db)) -> Response:
     }
     blocos = [
         {"maquina": maquinas[mid], **b}
-        for mid, b in sorted(por_maquina.items(), key=lambda kv: -float(kv[1]["total"]))
+        for mid, b in sorted(por_maquina.items(), key=lambda kv: -float(kv[1]["custo_dirceu"]))
         if mid in maquinas
     ]
     gerais = {
         campo: sum((b[campo] for b in blocos), Decimal("0"))
-        for campo in ("horas", "repasse", "bolso", "epr_direto", "total")
+        for campo in ("horas", "bolso", "despesas", "custo_dirceu", "epr")
     }
     pdf = pdf_periodo(get_config(db), de, ate, blocos, gerais)
     return _resp(pdf, f"periodo-{de.isoformat()}-a-{ate.isoformat()}.pdf")

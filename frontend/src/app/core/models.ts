@@ -45,7 +45,11 @@ export interface Maquina {
   data_inicio: string;
   data_finalizacao: string | null;
   obs: string | null;
-  custo: number;
+  // Contabilidade do Dirceu: margem/pct usam só o custo dele (bolso + despesas).
+  custo_dirceu: number;
+  custo_bolso_diarias: number;
+  custo_despesas: number;
+  custo_epr: number; // repasse + EPR direto — informativo, fora da margem
   horas: number;
   margem: number;
   pct_consumido: number;
@@ -229,7 +233,7 @@ export interface MaquinaAndamento {
   nome: string;
   status: MaquinaStatus;
   empreita: number;
-  custo: number;
+  custo_dirceu: number;
   margem: number;
   pct_consumido: number;
 }

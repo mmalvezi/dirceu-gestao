@@ -251,8 +251,8 @@ def _nota(pdf: DirceuPDF, texto: str):
 
 # ==================== 1) Dossiê da máquina ====================
 
-def pdf_maquina(config, maquina, entradas, custo, horas, margem, pct) -> DirceuPDF:
-    """entradas: lista de DiarioEntrada (com .trabalhos) em ordem ASC."""
+def pdf_maquina(config, maquina, entradas, ag, margem, pct) -> DirceuPDF:
+    """entradas: DiarioEntrada em ordem ASC; ag: Agregados (custo do Dirceu × EPR)."""
     pdf = DirceuPDF(
         config,
         "Relatório da máquina",
@@ -264,9 +264,9 @@ def pdf_maquina(config, maquina, entradas, custo, horas, margem, pct) -> DirceuP
     fim = data_br(maquina.data_finalizacao) if maquina.data_finalizacao else "em aberto"
     meta = [
         ("EMPREITA", f"R$ {moeda(maquina.empreita)}", INK, True),
-        ("CUSTO", f"R$ {moeda(custo)}", INK, True),
+        ("SEU CUSTO", f"R$ {moeda(ag.custo_dirceu)}", INK, True),
         ("MARGEM", f"R$ {moeda(margem)}", IN_GREEN if margem >= 0 else POCKET_RED, True),
-        ("HORAS", f"{horas_fmt(horas)}h", INK, True),
+        ("HORAS", f"{horas_fmt(ag.horas)}h", INK, True),
         ("STATUS", STATUS_LABEL.get(maquina.status, maquina.status), INK, False),
         ("PERÍODO", f"{data_br(maquina.data_inicio)} -> {fim}", INK, False),
     ]
@@ -285,6 +285,21 @@ def pdf_maquina(config, maquina, entradas, custo, horas, margem, pct) -> DirceuP
         pdf.cell(col_w, 6, L(valor))
     pdf.set_text_color(*INK)
     pdf.set_y(y0 + 27)
+    # Detalhe do custo do Dirceu e o que a EPR pagou (fora da margem).
+    pdf.set_font("helvetica", "", 8)
+    pdf.set_text_color(*SLATE)
+    if ag.despesas > 0:
+        pdf.cell(0, 4.5, L(
+            f"Seu custo: diárias do bolso R$ {moeda(ag.bolso_diarias)}"
+            f" + despesas R$ {moeda(ag.despesas)}"
+        ), new_x="LMARGIN", new_y="NEXT")
+    if ag.custo_epr > 0:
+        pdf.cell(0, 4.5, L(
+            f"Pago pela EPR (fora da margem): R$ {moeda(ag.custo_epr)}"
+            f" - repasse R$ {moeda(ag.repasse)} . direto R$ {moeda(ag.epr_direto)}"
+        ), new_x="LMARGIN", new_y="NEXT")
+    pdf.set_text_color(*INK)
+    pdf.ln(1)
     _linha_fina(pdf)
 
     # ---- diário em ordem cronológica (leitura tipo história) ----
@@ -325,10 +340,10 @@ def pdf_maquina(config, maquina, entradas, custo, horas, margem, pct) -> DirceuP
         pdf.ln(1)
 
     # ---- totais ----
-    _total_box(pdf, "Custo total", f"R$ {moeda(custo)}")
+    _total_box(pdf, "Seu custo total", f"R$ {moeda(ag.custo_dirceu)}")
     pdf.set_font("helvetica", "", 8.5)
     pdf.set_text_color(*SLATE)
-    pdf.write(5, L(f"Empreita R$ {moeda(maquina.empreita)} - custo R$ {moeda(custo)} = margem "))
+    pdf.write(5, L(f"Empreita R$ {moeda(maquina.empreita)} - seu custo R$ {moeda(ag.custo_dirceu)} = margem "))
     pdf.set_font("helvetica", "B", 8.5)
     pdf.set_text_color(*(IN_GREEN if margem >= 0 else POCKET_RED))
     pdf.write(5, L(f"R$ {moeda(margem)}"))
@@ -343,18 +358,21 @@ def pdf_maquina(config, maquina, entradas, custo, horas, margem, pct) -> DirceuP
 # ==================== 2) Consolidado do período ====================
 
 def pdf_periodo(config, de, ate, blocos, totais_gerais) -> DirceuPDF:
-    """blocos: [{maquina, horas, repasse, bolso, epr_direto, total}] — só com atividade."""
+    """blocos: [{maquina, horas, bolso, despesas, custo_dirceu, epr}] — só com atividade.
+
+    Custo do Dirceu (bolso + despesas) e pago pela EPR SEPARADOS — nunca somados.
+    """
     label = f"{data_curta(de)} a {data_curta(ate)}"
     pdf = DirceuPDF(config, "Relatório do período", label, rodape_id=f"Período {label}")
 
     if not blocos:
         _nada(pdf, "Nenhuma máquina com atividade no período.")
     cols = [
-        ("Horas", 26, "R"),
-        ("Repasse EPR", 34, "R"),
-        ("Do bolso", 34, "R"),
-        ("EPR direto", 34, "R"),
-        ("Custo total", 54, "R"),
+        ("Horas", 22, "R"),
+        ("Do bolso", 32, "R"),
+        ("Despesas", 32, "R"),
+        ("Seu custo", 42, "R"),
+        ("Pago pela EPR", 54, "R"),
     ]
     for b in blocos:
         m = b["maquina"]
@@ -372,10 +390,10 @@ def pdf_periodo(config, de, ate, blocos, totais_gerais) -> DirceuPDF:
         x = MARGIN
         valores = [
             f"{horas_fmt(b['horas'])}h",
-            moeda(b["repasse"]),
             moeda(b["bolso"]),
-            moeda(b["epr_direto"]),
-            f"R$ {moeda(b['total'])}",
+            moeda(b["despesas"]),
+            f"R$ {moeda(b['custo_dirceu'])}",
+            f"R$ {moeda(b['epr'])}",
         ]
         for (_, w, align), v in zip(cols, valores):
             pdf.set_xy(x, y)
@@ -392,17 +410,22 @@ def pdf_periodo(config, de, ate, blocos, totais_gerais) -> DirceuPDF:
     x = MARGIN
     valores = [
         f"{horas_fmt(totais_gerais['horas'])}h",
-        moeda(totais_gerais["repasse"]),
         moeda(totais_gerais["bolso"]),
-        moeda(totais_gerais["epr_direto"]),
-        f"R$ {moeda(totais_gerais['total'])}",
+        moeda(totais_gerais["despesas"]),
+        f"R$ {moeda(totais_gerais['custo_dirceu'])}",
+        f"R$ {moeda(totais_gerais['epr'])}",
     ]
     for (_, w, align), v in zip(cols, valores):
         pdf.set_xy(x, y)
         pdf.cell(w, 6, L(v), align=align)
         x += w
     pdf.set_y(y + 7)
-    _total_box(pdf, "Custo total do período", f"R$ {moeda(totais_gerais['total'])}")
+    _total_box(pdf, "Seu custo do período", f"R$ {moeda(totais_gerais['custo_dirceu'])}")
+    pdf.set_font("helvetica", "", 8.5)
+    pdf.set_text_color(*SLATE)
+    pdf.cell(0, 5, L(f"Pago pela EPR no período (fora da margem): R$ {moeda(totais_gerais['epr'])}"),
+             new_x="LMARGIN", new_y="NEXT")
+    pdf.set_text_color(*INK)
     return pdf
 
 

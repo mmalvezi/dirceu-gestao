@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import false, func
 from sqlalchemy.orm import Session
 
-from app.calc import agregados_por_maquina, calcular_margem_pct
+from app.calc import Agregados, agregados_por_maquina, calcular_margem_pct
 from app.database import get_db
 from app.models import DiarioEntrada, DiarioTrabalho, Maquina, Recebimento, RepasseEntrada
 from app.schemas import (
@@ -158,15 +158,15 @@ def dashboard(
     agregados = agregados_por_maquina(db, [m.id for m in nao_fechadas])
     maquinas_dash: list[MaquinaAndamentoDash] = []
     for m in nao_fechadas:
-        custo, _h = agregados.get(m.id, (Decimal("0"), Decimal("0")))
-        margem, pct = calcular_margem_pct(m.empreita, custo)
+        ag = agregados.get(m.id, Agregados())
+        margem, pct = calcular_margem_pct(m.empreita, ag.custo_dirceu)
         maquinas_dash.append(
             MaquinaAndamentoDash(
                 id=m.id,
                 nome=m.nome,
                 status=m.status,
                 empreita=float(m.empreita),
-                custo=float(custo),
+                custo_dirceu=float(ag.custo_dirceu),
                 margem=float(margem),
                 pct_consumido=pct,
             )
@@ -198,14 +198,14 @@ def dashboard(
         if mq.status == "andamento" and mq.pct_consumido >= 60:
             if mq.pct_consumido >= 70:
                 texto = (
-                    f"{mq.nome}: o custo já consumiu {mq.pct_consumido}% da empreita"
-                    f" (R$ {moeda(mq.custo)} de R$ {moeda(mq.empreita)})."
+                    f"{mq.nome}: seu custo já consumiu {mq.pct_consumido}% da empreita"
+                    f" (R$ {moeda(mq.custo_dirceu)} de R$ {moeda(mq.empreita)})."
                     " Margem em risco — reveja o combinado!"
                 )
             else:
                 texto = (
-                    f"{mq.nome}: o custo chegou a {mq.pct_consumido}% da empreita"
-                    f" (R$ {moeda(mq.custo)} de R$ {moeda(mq.empreita)})"
+                    f"{mq.nome}: seu custo chegou a {mq.pct_consumido}% da empreita"
+                    f" (R$ {moeda(mq.custo_dirceu)} de R$ {moeda(mq.empreita)})"
                     " e ela ainda está em andamento. Fica de olho na margem."
                 )
             avisos.append(

@@ -16,7 +16,7 @@
       </div>
       <div class="grid g4" style="margin-top:12px">
         <div><b class="tiny">EMPREITA</b><div class="val" style="font-size:17px">{{ fmtMoney(mq.empreita) }}</div></div>
-        <div><b class="tiny">CUSTO ATÉ AGORA</b><div class="val" style="font-size:17px">{{ fmtMoney(mq.custo) }}</div></div>
+        <div><b class="tiny">SEU CUSTO</b><div class="val" style="font-size:17px">{{ fmtMoney(mq.custo_dirceu) }}</div></div>
         <div><b class="tiny">MARGEM HOJE</b><div class="val" style="font-size:17px" [class.pos]="mq.margem >= 0" [class.neg]="mq.margem < 0">{{ fmtMoney(mq.margem) }}</div></div>
         <div><b class="tiny">HORAS</b><div class="val" style="font-size:17px">{{ fmtHoras(mq.horas) }}h</div></div>
       </div>
@@ -24,7 +24,15 @@
         <i class="{{ barCls(mq.pct_consumido) }}"
            [style.width.%]="mq.pct_consumido > 100 ? 100 : mq.pct_consumido"></i>
       </div>
-      <div class="tiny" style="margin-top:5px">{{ mq.pct_consumido }}% da empreita consumida em custos</div>
+      <div class="tiny" style="margin-top:5px">{{ mq.pct_consumido }}% da empreita consumida pelo seu custo</div>
+      @if (mq.custo_despesas > 0) {
+        <div class="tiny" style="margin-top:3px">
+          Seu custo: {{ fmtMoney(mq.custo_bolso_diarias) }} diárias + {{ fmtMoney(mq.custo_despesas) }} despesas
+        </div>
+      }
+      @if (mq.custo_epr > 0) {
+        <div class="tiny" style="margin-top:3px">EPR pagou: {{ fmtMoney(mq.custo_epr) }} (fora da margem)</div>
+      }
 
       <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
         @if (mq.status !== 'fechada') {

@@ -85,7 +85,7 @@
                    [style.width.%]="m.pct_consumido > 100 ? 100 : m.pct_consumido"></i>
               </div>
               <div class="tiny" style="margin-top:4px">
-                custo {{ fmtMoney(m.custo) }} · empreita {{ fmtMoney(m.empreita) }} · margem hoje
+                seu custo {{ fmtMoney(m.custo_dirceu) }} · empreita {{ fmtMoney(m.empreita) }} · margem hoje
                 <b class="val" [class.pos]="m.margem >= 0" [class.neg]="m.margem < 0">{{ fmtMoney(m.margem) }}</b>
               </div>
             </div>

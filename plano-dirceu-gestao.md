@@ -86,7 +86,7 @@ Sistema de gestão para o **Dirceu**, prestador PJ de caldeiraria e solda que ge
 
 **fechamentos** — id, numero (único, "FEC-0001"), data_geracao, periodo_de, periodo_ate, total_devido (num), total_adiantado (num), saldo (num), obs (opc)
 
-**Derivados (nunca colunas):** custo da máquina = Σ valores do diário; horas = Σ horas; margem = empreita − custo; caixa de repasse = Σ repasse_entradas − Σ trabalhos origem `repasse`; saído do bolso = Σ trabalhos origem `bolso`.
+**Derivados (nunca colunas) — contabilidade do DIRCEU:** custo_dirceu da máquina = Σ trabalhos origem `bolso` + Σ despesas vinculadas (repasse/EPR direto são pagos pela EPR — visíveis como custo_epr, FORA da margem); margem = empreita − custo_dirceu; pct_consumido = custo_dirceu/empreita; horas = Σ TODAS as horas (inclusive `proprio` — esforço, não dinheiro); caixa de repasse = Σ repasse_entradas − Σ trabalhos origem `repasse`; saído do bolso = Σ trabalhos origem `bolso`.
 
 ---
 
