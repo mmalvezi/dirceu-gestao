@@ -1,0 +1,109 @@
+<section class="screen">
+  @if (!dash()) {
+    <p class="muted">Carregando…</p>
+  }
+  @if (dash(); as d) {
+    <div class="row" style="margin-bottom:10px;flex-wrap:wrap">
+      <div class="h-sec" style="margin:0">Esta semana · {{ d.periodo.label }}</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input type="date" [(ngModel)]="de" name="de" (ngModelChange)="carregar()"
+               style="border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-size:12.5px" />
+        <input type="date" [(ngModel)]="ate" name="ate" (ngModelChange)="carregar()"
+               style="border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-size:12.5px" />
+      </div>
+    </div>
+
+    <!-- ================= KPIs ================= -->
+    <div class="grid g4">
+      <div class="card kpi hl">
+        <div class="lb">Horas lançadas</div>
+        <div class="v">{{ fmtHoras(d.kpis.horas_periodo) }} h</div>
+        <div class="s">{{ d.kpis.ajudantes_ativos_periodo }} ajudante(s) em campo</div>
+      </div>
+      <div class="card kpi">
+        <div class="lb">Pago a ajudantes</div>
+        <div class="v mono">{{ fmtMoney(d.kpis.pago_ajudantes.total) }}</div>
+        <div class="s">
+          <span style="color:var(--pass)">{{ subPago(d).repasse }} repasse</span> ·
+          <span style="color:var(--pocket)">{{ subPago(d).bolso }} bolso</span>
+          @if (subPago(d).epr) { · <span>{{ subPago(d).epr }} EPR direto</span> }
+        </div>
+      </div>
+      <div class="card kpi">
+        <div class="lb">Adiantado em aberto</div>
+        <div class="v mono">{{ fmtMoney(d.kpis.adiantado_aberto.total) }}</div>
+        <div class="s">{{ d.kpis.adiantado_aberto.quantidade }} adiantamento(s) a abater</div>
+      </div>
+      <div class="card kpi">
+        <div class="lb">A receber (fechamento)</div>
+        <div class="v mono pos">{{ fmtMoney(d.kpis.a_receber.total) }}</div>
+        <div class="s">{{ nomesAReceber(d) }}</div>
+      </div>
+    </div>
+
+    <!-- ================= AVISOS ================= -->
+    @if (d.avisos.length > 0) {
+      <div class="h-sec">Avisos</div>
+      @for (a of d.avisos; track $index) {
+        <div class="alert {{ avisoClasse(a) }}"
+             [style.cursor]="avisoClicavel(a) ? 'pointer' : 'default'"
+             (click)="avisoClicavel(a) && clicarAviso(a)">
+          <app-icon name="alert" />
+          <div>{{ a.texto }}@if (avisoClicavel(a)) { <b> →</b> }</div>
+        </div>
+      }
+    } @else {
+      <div class="h-sec">Avisos</div>
+      <p class="muted">Tudo em dia ✓</p>
+    }
+
+    <!-- ================= HORAS + MARGENS ================= -->
+    <div class="grid g2" style="margin-top:18px">
+      <div class="card">
+        <div class="h-sec" style="margin-top:0">Horas por dia</div>
+        <div class="hours">
+          @for (h of d.horas_por_dia; track h.data) {
+            <div class="d" [class.today]="h.hoje">
+              <i [style.height.%]="alturaBarra(h.horas)"></i>
+              <b>{{ h.dia }}</b>
+              <span>{{ h.horas > 0 ? fmtHoras(h.horas) + 'h' : '—' }}</span>
+            </div>
+          }
+        </div>
+      </div>
+      <div class="card">
+        <div class="h-sec" style="margin-top:0">Margem das máquinas em andamento</div>
+        @if (d.maquinas_andamento.length === 0) {
+          <p class="muted">Nenhuma máquina em andamento.</p>
+        }
+        <div class="list">
+          @for (m of d.maquinas_andamento; track m.id) {
+            <div style="cursor:pointer" (click)="abrirMaquina(m.id)">
+              <div class="row"><b>{{ m.nome }}</b><span class="muted">{{ m.pct_consumido }}% da empreita</span></div>
+              <div class="bar" style="margin-top:6px">
+                <i class="{{ barraClasse(m.pct_consumido) }}"
+                   [style.width.%]="m.pct_consumido > 100 ? 100 : m.pct_consumido"></i>
+              </div>
+              <div class="tiny" style="margin-top:4px">
+                custo {{ fmtMoney(m.custo) }} · empreita {{ fmtMoney(m.empreita) }} · margem hoje
+                <b class="val" [class.pos]="m.margem >= 0" [class.neg]="m.margem < 0">{{ fmtMoney(m.margem) }}</b>
+              </div>
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= RESUMO WHATSAPP ================= -->
+    <div class="card" style="margin-top:14px">
+      <div class="row">
+        <div class="h-sec" style="margin:0">Resumo da semana (WhatsApp)</div>
+        <div style="display:flex;gap:8px">
+          <a class="btn btn-o btn-s" [href]="waHref()" target="_blank" rel="noopener">Abrir no WhatsApp</a>
+          <button class="btn btn-g btn-s" (click)="copiar()">{{ copiado() ? 'Copiado ✓' : 'Copiar' }}</button>
+        </div>
+      </div>
+      <div class="wa-box">{{ d.resumo_whatsapp }}</div>
+    </div>
+  }
+</section>

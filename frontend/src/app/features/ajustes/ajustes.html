@@ -1,0 +1,60 @@
+<section class="screen">
+  <div class="h-sec">Ajustes</div>
+
+  @if (!config()) {
+    <p class="muted">Carregando…</p>
+  }
+  @if (config(); as c) {
+    <div class="card">
+      <div class="h-sec" style="margin-top:0">Identidade</div>
+      @if (erro()) {
+        <div class="alert a-hot"><app-icon name="alert" /><div>{{ erro() }}</div></div>
+      }
+      <div class="f">
+        <label>Nome de exibição</label>
+        <input [(ngModel)]="nome" name="nome" />
+      </div>
+      <div class="f">
+        <label>Telefone</label>
+        <input [(ngModel)]="telefone" name="telefone" placeholder="(19) 99999-9999" />
+      </div>
+      <button class="btn btn-p btn-s" (click)="salvar()">{{ salvo() ? 'Salvo ✓' : 'Salvar' }}</button>
+
+      <div class="f" style="margin-top:18px">
+        <label>Logo</label>
+        @if (logoUrl(); as url) {
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+            <img [src]="url" alt="Logo" style="height:56px;border-radius:8px;border:1px solid var(--line);background:#fff;padding:4px" />
+            <button class="btn btn-o btn-s" (click)="removerLogo()">Remover logo</button>
+          </div>
+        } @else {
+          <p class="muted" style="margin-bottom:8px">Nenhum logo — a marca DC padrão é usada.</p>
+        }
+        <input type="file" accept="image/*" (change)="aoEscolherLogo($event)"
+               [disabled]="enviandoLogo()" style="margin-top:8px" />
+        @if (enviandoLogo()) { <span class="tiny">Enviando…</span> }
+        <div class="tiny" style="margin-top:6px">
+          O logo entra no cabeçalho de todos os PDFs (relatórios e fechamentos).
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:12px">
+      <div class="h-sec" style="margin-top:0">Sessão</div>
+      <div class="row">
+        <div>
+          <b>{{ usuario()?.username || '…' }}</b>
+          <div class="tiny">usuário conectado</div>
+        </div>
+        <button class="btn btn-o btn-s" (click)="sair()"><app-icon name="out" /> Sair</button>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:12px">
+      <div class="h-sec" style="margin-top:0">Sobre</div>
+      <b>{{ c.nome_exibicao }}</b>
+      <div class="tiny" style="margin-top:4px">Sistema de gestão de empreitas · v1.0</div>
+      <div class="tiny">Malvezi Sistemas</div>
+    </div>
+  }
+</section>

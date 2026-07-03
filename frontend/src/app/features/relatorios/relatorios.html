@@ -1,0 +1,94 @@
+<section class="screen">
+  <div class="h-sec">Relatórios em PDF</div>
+  <div class="grid g2">
+    @for (c of CARDS; track c.tipo) {
+      <div class="card rep">
+        <div class="ic"><app-icon name="rep" /></div>
+        <div style="flex:1"><h4>{{ c.titulo }}</h4><p>{{ c.desc }}</p></div>
+        <button class="btn btn-o btn-s" (click)="abrir(c.tipo)"><app-icon name="pdf" /> PDF</button>
+      </div>
+    }
+  </div>
+  <div class="alert a-info" style="margin-top:12px">
+    <app-icon name="alert" />
+    <div>Todos os relatórios aceitam filtro de <b>período</b> e, quando faz sentido, de <b>máquina</b> e <b>ajudante</b>. Saem em PDF com o cabeçalho do Dirceu.</div>
+  </div>
+</section>
+
+@if (modal(); as tipo) {
+  <app-modal (fechado)="modal.set(null)">
+    <h3>
+      @switch (tipo) {
+        @case ('maquina') { Relatório por máquina }
+        @case ('periodo') { Relatório do período }
+        @case ('ajudantes') { Saídas — ajudantes }
+        @case ('entradas') { Entradas — recebimentos }
+        @case ('fechamento') { Fechamento }
+      }
+    </h3>
+    <div class="muted">Escolha os parâmetros e gere o PDF</div>
+
+    @if (erro()) {
+      <div class="alert a-hot"><app-icon name="alert" /><div>{{ erro() }}</div></div>
+    }
+
+    @if (tipo === 'maquina') {
+      <div class="f">
+        <label>Máquina</label>
+        <select [(ngModel)]="rMaquinaId" name="rMaquinaId">
+          @for (m of maquinas(); track m.id) {
+            <option [value]="m.id">{{ m.nome }} — {{ m.cliente }}</option>
+          }
+        </select>
+      </div>
+    }
+
+    @if (tipo === 'periodo' || tipo === 'ajudantes' || tipo === 'entradas') {
+      <div class="f-2">
+        <div class="f"><label>De</label><input type="date" [(ngModel)]="rDe" name="rDe" /></div>
+        <div class="f"><label>Até</label><input type="date" [(ngModel)]="rAte" name="rAte" /></div>
+      </div>
+    }
+
+    @if (tipo === 'ajudantes') {
+      <div class="f">
+        <label>Ajudante</label>
+        <select [(ngModel)]="rAjudanteId" name="rAjudanteId">
+          <option value="">Todos</option>
+          @for (a of ajudantes(); track a.id) {
+            <option [value]="a.id">{{ a.nome }}</option>
+          }
+        </select>
+      </div>
+    }
+
+    @if (tipo === 'fechamento') {
+      <div class="seg">
+        <button [class.on]="rModoFech === 'registrado'" (click)="rModoFech = 'registrado'">Registrado</button>
+        <button [class.on]="rModoFech === 'previa'" (click)="rModoFech = 'previa'">Prévia de um período</button>
+      </div>
+      @if (rModoFech === 'registrado') {
+        <div class="f">
+          <label>Fechamento</label>
+          <select [(ngModel)]="rFechamentoId" name="rFechamentoId">
+            @for (f of fechamentos(); track f.id) {
+              <option [value]="f.id">{{ f.numero }} — {{ fmtData(f.periodo_de) }} a {{ fmtData(f.periodo_ate) }}</option>
+            }
+          </select>
+        </div>
+      } @else {
+        <div class="f-2">
+          <div class="f"><label>De</label><input type="date" [(ngModel)]="rDe" name="rDe" /></div>
+          <div class="f"><label>Até</label><input type="date" [(ngModel)]="rAte" name="rAte" /></div>
+        </div>
+      }
+    }
+
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+      <button class="btn btn-o" (click)="modal.set(null)">Cancelar</button>
+      <button class="btn btn-p" (click)="gerar()" [disabled]="gerando()">
+        <app-icon name="pdf" /> {{ gerando() ? 'Gerando…' : 'Gerar PDF' }}
+      </button>
+    </div>
+  </app-modal>
+}

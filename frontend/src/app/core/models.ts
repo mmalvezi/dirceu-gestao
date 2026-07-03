@@ -223,6 +223,8 @@ export interface MaquinaAndamento {
 export interface Aviso {
   nivel: 'warn' | 'hot' | 'info';
   texto: string;
+  tipo: 'fechamento_pendente' | 'custo_alto' | 'caixa' | 'adiantamento_antigo' | null;
+  maquina_id: number | null;
 }
 
 export interface Dashboard {
