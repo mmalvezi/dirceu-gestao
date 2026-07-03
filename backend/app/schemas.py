@@ -266,3 +266,72 @@ class FechamentoOut(BaseModel):
 class FechamentoDetalheOut(FechamentoOut):
     adiantamentos: list[FechamentoAdiantamento]
     recebimento_fechamento: RecebimentoOut | None = None
+
+
+# ----- Dashboard -----
+
+class DashboardPeriodo(BaseModel):
+    de: date
+    ate: date
+    label: str  # ex.: "29/06 a 05/07"
+
+
+class PagoAjudantes(BaseModel):
+    total: float
+    repasse: float
+    bolso: float
+    epr_direto: float
+
+
+class AdiantadoAbertoKpi(BaseModel):
+    total: float
+    quantidade: int
+
+
+class AReceberMaquina(BaseModel):
+    nome: str
+    valor: float
+
+
+class AReceberKpi(BaseModel):
+    total: float
+    maquinas: list[AReceberMaquina]
+
+
+class DashboardKpis(BaseModel):
+    horas_periodo: float
+    ajudantes_ativos_periodo: int
+    pago_ajudantes: PagoAjudantes
+    adiantado_aberto: AdiantadoAbertoKpi
+    a_receber: AReceberKpi
+
+
+class HorasDia(BaseModel):
+    dia: str  # seg/ter/qua/qui/sex/sáb/dom
+    data: date
+    horas: float
+    hoje: bool
+
+
+class MaquinaAndamentoDash(BaseModel):
+    id: int
+    nome: str
+    status: str
+    empreita: float
+    custo: float
+    margem: float
+    pct_consumido: int
+
+
+class Aviso(BaseModel):
+    nivel: str  # warn / hot / info
+    texto: str
+
+
+class DashboardOut(BaseModel):
+    periodo: DashboardPeriodo
+    kpis: DashboardKpis
+    horas_por_dia: list[HorasDia]
+    maquinas_andamento: list[MaquinaAndamentoDash]
+    avisos: list[Aviso]
+    resumo_whatsapp: str

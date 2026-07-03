@@ -12,6 +12,7 @@ from app.routers import (
     ajudantes,
     auth,
     config as config_router,
+    dashboard,
     diario,
     fechamentos,
     financeiro,
@@ -54,6 +55,7 @@ app.include_router(recebimentos.router)
 app.include_router(repasses.router)
 app.include_router(financeiro.router)
 app.include_router(fechamentos.router)
+app.include_router(dashboard.router)
 
 
 @app.get("/health")
