@@ -1,0 +1,23 @@
+.login-wrap {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 380px;
+  padding: 24px;
+
+  .brand {
+    margin-bottom: 20px;
+  }
+}
+
+.login-btn {
+  width: 100%;
+  justify-content: center;
+  margin-top: 4px;
+}

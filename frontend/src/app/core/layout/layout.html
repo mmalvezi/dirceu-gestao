@@ -1,0 +1,62 @@
+<div class="app">
+
+  <!-- SIDEBAR DESKTOP -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="mark"><span>DC</span></div>
+      <div><h1>Dirceu</h1><small>Caldeiraria &amp; Solda</small></div>
+    </div>
+    <nav class="snav">
+      @for (item of nav; track item.path) {
+        <a [routerLink]="item.path" routerLinkActive="on"
+           [routerLinkActiveOptions]="{ exact: item.exact }">
+          <app-icon [name]="item.icon" /><span>{{ item.label }}</span>
+        </a>
+      }
+    </nav>
+    <div class="sfoot">
+      <a class="foot-link" routerLink="/ajustes" routerLinkActive="on">
+        <app-icon name="gear" /> Ajustes
+      </a>
+      <button class="foot-link" (click)="sair()">
+        <app-icon name="out" /> Sair
+      </button>
+      <div class="assin">Malvezi Sistemas</div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <!-- topo mobile: marca + chip da data + engrenagem -->
+    <div class="mtop">
+      <div class="brand">
+        <div class="mark"><span>DC</span></div>
+        <div><h1>Dirceu</h1><small>Caldeiraria &amp; Solda</small></div>
+      </div>
+      <div class="mtop-right">
+        <span class="chip c-neutral">{{ hojeChip }}</span>
+        <a class="gear-btn" routerLink="/ajustes" aria-label="Ajustes">
+          <app-icon name="gear" />
+        </a>
+      </div>
+    </div>
+
+    <router-outlet />
+  </main>
+</div>
+
+<!-- TABBAR MOBILE -->
+<nav class="tabbar">
+  @for (item of nav; track item.path) {
+    <a [routerLink]="item.path" routerLinkActive="on"
+       [routerLinkActiveOptions]="{ exact: item.exact }">
+      <app-icon [name]="item.icon" /><span>{{ item.label }}</span>
+    </a>
+  }
+</nav>
+
+<!-- FAB "Lançar dia" (só nas telas de máquinas, como no protótipo) -->
+@if (mostraFab) {
+  <button class="fab" (click)="lancarDia()">
+    <app-icon name="plus" /> Lançar dia
+  </button>
+}

@@ -1,0 +1,31 @@
+<div class="login-wrap">
+  <div class="card login-card">
+    <div class="brand">
+      <div class="mark"><span>DC</span></div>
+      <div><h1>Dirceu</h1><small>Caldeiraria &amp; Solda</small></div>
+    </div>
+
+    @if (erro()) {
+      <div class="alert a-hot">
+        <app-icon name="alert" />
+        <div>{{ erro() }}</div>
+      </div>
+    }
+
+    <form (ngSubmit)="entrar()">
+      <div class="f">
+        <label for="username">Usuário</label>
+        <input id="username" name="username" [(ngModel)]="username"
+               autocomplete="username" autocapitalize="none" autofocus />
+      </div>
+      <div class="f">
+        <label for="password">Senha</label>
+        <input id="password" name="password" type="password" [(ngModel)]="password"
+               autocomplete="current-password" />
+      </div>
+      <button class="btn btn-p login-btn" type="submit" [disabled]="carregando()">
+        {{ carregando() ? 'Entrando…' : 'Entrar' }}
+      </button>
+    </form>
+  </div>
+</div>
