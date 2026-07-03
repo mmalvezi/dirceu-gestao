@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
+from app.routers import auth
 from app.seed import run_seed
 
 
@@ -32,6 +33,9 @@ app.add_middleware(
 # Garante que a pasta de mídia existe e a expõe em /media.
 os.makedirs(settings.MEDIA_DIR, exist_ok=True)
 app.mount("/media", StaticFiles(directory=settings.MEDIA_DIR), name="media")
+
+
+app.include_router(auth.router)
 
 
 @app.get("/health")
