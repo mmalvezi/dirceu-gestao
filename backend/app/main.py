@@ -17,6 +17,7 @@ from app.routers import (
     fechamentos,
     financeiro,
     maquinas,
+    pdf,
     recebimentos,
     repasses,
 )
@@ -56,6 +57,7 @@ app.include_router(repasses.router)
 app.include_router(financeiro.router)
 app.include_router(fechamentos.router)
 app.include_router(dashboard.router)
+app.include_router(pdf.router)
 
 
 @app.get("/health")

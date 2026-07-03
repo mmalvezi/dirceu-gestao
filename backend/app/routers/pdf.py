@@ -1,0 +1,236 @@
+"""Rotas dos relatórios PDF (todas protegidas). Monta os dados e delega ao app/pdf.py."""
+
+from datetime import date
+from decimal import Decimal
+
+from fastapi import APIRouter, Depends, HTTPException, Response
+from sqlalchemy import func
+from sqlalchemy.orm import Session, selectinload
+
+from app.calc import agregados_por_maquina, calcular_margem_pct
+from app.database import get_db
+from app.models import (
+    Ajudante,
+    DiarioEntrada,
+    DiarioTrabalho,
+    Fechamento,
+    Maquina,
+    Recebimento,
+    RepasseEntrada,
+)
+from app.pdf import (
+    pdf_ajudantes,
+    pdf_entradas,
+    pdf_fechamento,
+    pdf_maquina,
+    pdf_periodo,
+    slug,
+)
+from app.routers.config import get_config
+from app.routers.fechamentos import _calcular_previa
+from app.security import get_current_user
+from app.utils import data_curta
+
+router = APIRouter(prefix="/pdf", tags=["pdf"], dependencies=[Depends(get_current_user)])
+
+
+def _dec(v) -> Decimal:
+    return Decimal(str(v)) if v is not None else Decimal("0")
+
+
+def _resp(pdf, filename: str) -> Response:
+    return Response(
+        content=bytes(pdf.output()),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="{filename}"'},
+    )
+
+
+def _periodo_ok(de: date, ate: date) -> None:
+    if de > ate:
+        raise HTTPException(status_code=422, detail="Período inválido: 'de' deve ser <= 'ate'.")
+
+
+# -------- 1) dossiê da máquina --------
+
+@router.get("/maquina/{maquina_id}")
+def rel_maquina(maquina_id: int, db: Session = Depends(get_db)) -> Response:
+    maquina = db.get(Maquina, maquina_id)
+    if maquina is None:
+        raise HTTPException(status_code=404, detail="Máquina não encontrada")
+
+    entradas = (
+        db.query(DiarioEntrada)
+        .filter(DiarioEntrada.maquina_id == maquina_id)
+        .options(selectinload(DiarioEntrada.trabalhos))
+        .order_by(DiarioEntrada.data.asc(), DiarioEntrada.id.asc())
+        .all()
+    )
+    custo, horas = agregados_por_maquina(db, [maquina_id]).get(
+        maquina_id, (Decimal("0"), Decimal("0"))
+    )
+    margem, pct = calcular_margem_pct(maquina.empreita, custo)
+    pdf = pdf_maquina(get_config(db), maquina, entradas, custo, horas, margem, pct)
+    return _resp(pdf, f"maquina-{slug(maquina.nome)}.pdf")
+
+
+# -------- 2) consolidado do período --------
+
+@router.get("/periodo")
+def rel_periodo(de: date, ate: date, db: Session = Depends(get_db)) -> Response:
+    _periodo_ok(de, ate)
+    rows = (
+        db.query(
+            DiarioEntrada.maquina_id,
+            DiarioTrabalho.origem,
+            func.coalesce(func.sum(DiarioTrabalho.valor), 0),
+            func.coalesce(func.sum(DiarioTrabalho.horas), 0),
+        )
+        .join(DiarioTrabalho, DiarioTrabalho.entrada_id == DiarioEntrada.id)
+        .filter(DiarioEntrada.data >= de, DiarioEntrada.data <= ate)
+        .group_by(DiarioEntrada.maquina_id, DiarioTrabalho.origem)
+        .all()
+    )
+    por_maquina: dict[int, dict] = {}
+    for mid, origem, valor, horas in rows:
+        b = por_maquina.setdefault(
+            mid,
+            {"horas": Decimal("0"), "repasse": Decimal("0"), "bolso": Decimal("0"),
+             "epr_direto": Decimal("0"), "total": Decimal("0")},
+        )
+        b[origem] = b.get(origem, Decimal("0")) + _dec(valor)
+        b["horas"] += _dec(horas)
+        b["total"] += _dec(valor)
+
+    maquinas = {
+        m.id: m
+        for m in db.query(Maquina).filter(Maquina.id.in_(por_maquina.keys())).all()
+    }
+    blocos = [
+        {"maquina": maquinas[mid], **b}
+        for mid, b in sorted(por_maquina.items(), key=lambda kv: -float(kv[1]["total"]))
+        if mid in maquinas
+    ]
+    gerais = {
+        campo: sum((b[campo] for b in blocos), Decimal("0"))
+        for campo in ("horas", "repasse", "bolso", "epr_direto", "total")
+    }
+    pdf = pdf_periodo(get_config(db), de, ate, blocos, gerais)
+    return _resp(pdf, f"periodo-{de.isoformat()}-a-{ate.isoformat()}.pdf")
+
+
+# -------- 3) saídas — ajudantes --------
+
+@router.get("/ajudantes")
+def rel_ajudantes(
+    de: date, ate: date, ajudante_id: int | None = None, db: Session = Depends(get_db)
+) -> Response:
+    _periodo_ok(de, ate)
+    if ajudante_id is not None and db.get(Ajudante, ajudante_id) is None:
+        raise HTTPException(status_code=404, detail="Ajudante não encontrado")
+
+    query = (
+        db.query(DiarioTrabalho, DiarioEntrada.data, Maquina.nome)
+        .join(DiarioEntrada, DiarioTrabalho.entrada_id == DiarioEntrada.id)
+        .join(Maquina, DiarioEntrada.maquina_id == Maquina.id)
+        .filter(DiarioEntrada.data >= de, DiarioEntrada.data <= ate)
+    )
+    if ajudante_id is not None:
+        query = query.filter(DiarioTrabalho.ajudante_id == ajudante_id)
+    rows = query.order_by(DiarioEntrada.data.asc(), DiarioTrabalho.id.asc()).all()
+
+    grupos_map: dict[str, dict] = {}
+    for t, data_entrada, maquina_nome in rows:
+        g = grupos_map.setdefault(
+            t.ajudante_nome,
+            {"nome": t.ajudante_nome, "itens": [], "horas": Decimal("0"), "valor": Decimal("0")},
+        )
+        g["itens"].append(
+            {"data": data_entrada, "maquina": maquina_nome, "horas": t.horas,
+             "origem": t.origem, "valor": t.valor}
+        )
+        g["horas"] += _dec(t.horas)
+        g["valor"] += _dec(t.valor)
+    grupos = sorted(grupos_map.values(), key=lambda g: g["nome"].lower())
+    total_geral = sum((g["valor"] for g in grupos), Decimal("0"))
+
+    pdf = pdf_ajudantes(get_config(db), de, ate, grupos, total_geral)
+    sufixo = f"-{slug(grupos[0]['nome'])}" if (ajudante_id is not None and grupos) else ""
+    return _resp(pdf, f"ajudantes-{de.isoformat()}-a-{ate.isoformat()}{sufixo}.pdf")
+
+
+# -------- 4) entradas — recebimentos --------
+
+@router.get("/entradas")
+def rel_entradas(de: date, ate: date, db: Session = Depends(get_db)) -> Response:
+    _periodo_ok(de, ate)
+    recebimentos = (
+        db.query(Recebimento)
+        .filter(Recebimento.data >= de, Recebimento.data <= ate)
+        .order_by(Recebimento.data.asc(), Recebimento.id.asc())
+        .all()
+    )
+    total_receb = sum((_dec(r.valor) for r in recebimentos), Decimal("0"))
+    repasses = (
+        db.query(RepasseEntrada)
+        .filter(RepasseEntrada.data >= de, RepasseEntrada.data <= ate)
+        .order_by(RepasseEntrada.data.asc(), RepasseEntrada.id.asc())
+        .all()
+    )
+    total_repasses = sum((_dec(v.valor) for v in repasses), Decimal("0"))
+    pdf = pdf_entradas(get_config(db), de, ate, recebimentos, total_receb, repasses, total_repasses)
+    return _resp(pdf, f"entradas-{de.isoformat()}-a-{ate.isoformat()}.pdf")
+
+
+# -------- 5) fechamento (registrado) e prévia --------
+
+@router.get("/fechamento-previa")
+def rel_fechamento_previa(de: date, ate: date, db: Session = Depends(get_db)) -> Response:
+    _periodo_ok(de, ate)
+    maquinas, adiantamentos, devido, adiantado, saldo = _calcular_previa(db, de, ate)
+    label = f"{data_curta(de)} a {data_curta(ate)}"
+    pdf = pdf_fechamento(
+        get_config(db),
+        numero="PRÉVIA",
+        sub=f"Prévia . período {label}",
+        maquinas=maquinas,
+        adiantamentos=adiantamentos,
+        total_devido=devido,
+        total_adiantado=adiantado,
+        saldo=saldo,
+        obs=None,
+        previa=True,
+    )
+    return _resp(pdf, f"fechamento-previa-{de.isoformat()}-a-{ate.isoformat()}.pdf")
+
+
+@router.get("/fechamento/{fechamento_id}")
+def rel_fechamento(fechamento_id: int, db: Session = Depends(get_db)) -> Response:
+    fech = db.get(Fechamento, fechamento_id)
+    if fech is None:
+        raise HTTPException(status_code=404, detail="Fechamento não encontrado")
+    maquinas = (
+        db.query(Maquina)
+        .filter(Maquina.fechamento_id == fech.id)
+        .order_by(Maquina.data_finalizacao, Maquina.id)
+        .all()
+    )
+    adiantamentos = (
+        db.query(Recebimento)
+        .filter(Recebimento.fechamento_id == fech.id, Recebimento.tipo == "adiantamento")
+        .order_by(Recebimento.data.asc(), Recebimento.id.asc())
+        .all()
+    )
+    label = f"{data_curta(fech.periodo_de)} a {data_curta(fech.periodo_ate)}"
+    pdf = pdf_fechamento(
+        get_config(db),
+        numero=fech.numero,
+        sub=f"{fech.numero} . período {label}",
+        maquinas=maquinas,
+        adiantamentos=adiantamentos,
+        total_devido=_dec(fech.total_devido),
+        total_adiantado=_dec(fech.total_adiantado),
+        saldo=_dec(fech.saldo),
+        obs=fech.obs,
+    )
+    return _resp(pdf, f"fechamento-{slug(fech.numero)}.pdf")
