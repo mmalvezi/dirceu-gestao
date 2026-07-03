@@ -24,6 +24,7 @@ from app.pdf import (
     pdf_entradas,
     pdf_fechamento,
     pdf_maquina,
+    pdf_maquinas_consolidado,
     pdf_periodo,
     pdf_resultado,
     slug,
@@ -72,6 +73,54 @@ def rel_maquina(maquina_id: int, db: Session = Depends(get_db)) -> Response:
     margem, pct = calcular_margem_pct(maquina.empreita, ag.custo_dirceu)
     pdf = pdf_maquina(get_config(db), maquina, entradas, ag, margem, pct)
     return _resp(pdf, f"maquina-{slug(maquina.nome)}.pdf")
+
+
+# -------- 1b) consolidado de máquinas por status --------
+
+_ROTULO_STATUS = {"todas": "Todas", "andamento": "Em andamento",
+                  "finalizada": "Finalizadas", "fechada": "Fechadas"}
+
+
+@router.get("/maquinas")
+def rel_maquinas(status: str = "todas", db: Session = Depends(get_db)) -> Response:
+    if status not in _ROTULO_STATUS:
+        raise HTTPException(status_code=422, detail="Status inválido")
+    query = db.query(Maquina)
+    if status != "todas":
+        query = query.filter(Maquina.status == status)
+    maquinas = query.order_by(Maquina.data_inicio.desc(), Maquina.id.desc()).all()
+    if not maquinas:
+        raise HTTPException(status_code=404, detail="Nenhuma máquina neste status.")
+
+    ags = agregados_por_maquina(db, [m.id for m in maquinas])
+    blocos, totais = [], {"empreita": Decimal("0"), "custo_dirceu": Decimal("0"),
+                          "epr": Decimal("0"), "margem": Decimal("0"), "horas": Decimal("0")}
+    for m in maquinas:
+        ag = ags.get(m.id, Agregados())
+        margem, pct = calcular_margem_pct(m.empreita, ag.custo_dirceu)
+        entradas = (
+            db.query(DiarioEntrada)
+            .filter(DiarioEntrada.maquina_id == m.id)
+            .options(selectinload(DiarioEntrada.trabalhos))
+            .order_by(DiarioEntrada.data.desc(), DiarioEntrada.id.desc())
+            .limit(10)
+            .all()
+        )
+        total_entradas = (
+            db.query(func.count(DiarioEntrada.id))
+            .filter(DiarioEntrada.maquina_id == m.id)
+            .scalar() or 0
+        )
+        blocos.append({"maquina": m, "ag": ag, "margem": margem, "pct": pct,
+                       "entradas": entradas, "mais_n": max(0, total_entradas - 10)})
+        totais["empreita"] += _dec(m.empreita)
+        totais["custo_dirceu"] += ag.custo_dirceu
+        totais["epr"] += ag.custo_epr
+        totais["margem"] += margem
+        totais["horas"] += ag.horas
+
+    pdf = pdf_maquinas_consolidado(get_config(db), _ROTULO_STATUS[status], blocos, totais)
+    return _resp(pdf, f"maquinas-{status}.pdf")
 
 
 # -------- 2) consolidado do período --------

@@ -34,14 +34,39 @@
     }
 
     @if (tipo === 'maquina') {
-      <div class="f">
-        <label>Máquina</label>
-        <select [(ngModel)]="rMaquinaId" name="rMaquinaId">
-          @for (m of maquinas(); track m.id) {
-            <option [value]="m.id">{{ m.nome }} — {{ m.cliente }}</option>
+      <div class="f" style="margin-bottom:8px">
+        <label>Ou gere um consolidado</label>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          @for (c of CONSOLIDADOS; track c[0]) {
+            <button type="button" class="chip c-neutral" style="border:0;cursor:pointer"
+                    [disabled]="gerando()" (click)="gerarConsolidado(c[0])">{{ c[1] }}</button>
           }
-        </select>
+        </div>
       </div>
+
+      <div class="seg">
+        @for (f of FILTROS_STATUS; track f[0]) {
+          <button type="button" [class.on]="selStatus === f[0]" (click)="selStatus = f[0]">{{ f[1] }}</button>
+        }
+      </div>
+      <div class="f" style="margin-bottom:8px">
+        <input [(ngModel)]="selBusca" name="selBusca" placeholder="Buscar por nome ou cliente…" />
+      </div>
+      <div style="max-height:288px;overflow:auto;display:flex;flex-direction:column;gap:6px">
+        @for (m of maquinasFiltradas(); track m.id) {
+          <div (click)="selecionar(m)"
+               style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:11px 12px;border:1px solid var(--line);border-radius:9px;cursor:pointer"
+               [style.borderColor]="selecionada(m) ? 'var(--weld)' : ''"
+               [style.background]="selecionada(m) ? 'var(--weld-soft)' : '#fff'">
+            <div><b style="font-size:13.5px">{{ m.nome }}</b><div class="tiny">{{ m.cliente }}</div></div>
+            <span class="badge {{ badge[m.status][1] }}">{{ badge[m.status][0] }}</span>
+          </div>
+        }
+        @if (maquinasFiltradas().length === 0) {
+          <p class="muted">Nenhuma máquina encontrada.</p>
+        }
+      </div>
+      <div class="tiny" style="margin-top:6px">{{ contagem() }}</div>
     }
 
     @if (tipo === 'periodo' || tipo === 'ajudantes' || tipo === 'entradas' || tipo === 'resultado') {
@@ -87,7 +112,8 @@
 
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
       <button class="btn btn-o" (click)="modal.set(null)">Cancelar</button>
-      <button class="btn btn-p" (click)="gerar()" [disabled]="gerando()">
+      <button class="btn btn-p" (click)="gerar()"
+              [disabled]="gerando() || (modal() === 'maquina' && !rMaquinaId)">
         <app-icon name="pdf" /> {{ gerando() ? 'Gerando…' : 'Gerar PDF' }}
       </button>
     </div>

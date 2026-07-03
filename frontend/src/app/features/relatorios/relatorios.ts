@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 
 import { ApiService } from '../../core/api.service';
 import { Icon } from '../../core/icon';
+import { STATUS_BADGE } from '../../core/labels';
 import { Ajudante, Fechamento, Maquina } from '../../core/models';
 import { AjudanteService } from '../../core/services/ajudante.service';
 import { FechamentoService } from '../../core/services/fechamento.service';
@@ -31,6 +32,15 @@ export class RelatoriosPage implements OnInit {
   private fechamentosSvc = inject(FechamentoService);
 
   fmtData = formatDate;
+  badge = STATUS_BADGE;
+  FILTROS_STATUS: [string, string][] = [
+    ['', 'Todas'], ['andamento', 'Em andamento'], ['finalizada', 'Finalizadas'], ['fechada', 'Fechadas'],
+  ];
+  CONSOLIDADOS: [string, string][] = [
+    ['todas', 'Todas'], ['andamento', 'Em andamento'], ['finalizada', 'Finalizadas'], ['fechada', 'Fechadas'],
+  ];
+  selStatus = '';
+  selBusca = '';
 
   CARDS: CardRel[] = [
     { tipo: 'maquina', titulo: 'Relatório por máquina', desc: 'Diário completo, custos, horas e margem de uma máquina.' },
@@ -68,10 +78,52 @@ export class RelatoriosPage implements OnInit {
 
   abrir(tipo: TipoRel): void {
     this.erro.set('');
-    if (tipo === 'maquina' && this.maquinas().length && !this.rMaquinaId) {
-      this.rMaquinaId = String(this.maquinas()[0].id);
+    if (tipo === 'maquina') {
+      this.selStatus = '';
+      this.selBusca = '';
+      this.rMaquinaId = '';
     }
     this.modal.set(tipo);
+  }
+
+  selecionar(m: Maquina): void {
+    this.rMaquinaId = String(m.id);
+  }
+
+  selecionada(m: Maquina): boolean {
+    return this.rMaquinaId === String(m.id);
+  }
+
+  maquinasFiltradas(): Maquina[] {
+    const q = this.selBusca.trim().toLowerCase();
+    return this.maquinas().filter(
+      (m) =>
+        (!this.selStatus || m.status === this.selStatus) &&
+        (!q || m.nome.toLowerCase().includes(q) || m.cliente.toLowerCase().includes(q)),
+    );
+  }
+
+  contagem(): string {
+    const ms = this.maquinasFiltradas();
+    const and = ms.filter((m) => m.status === 'andamento').length;
+    return `${ms.length} máquina(s)` + (and ? ` · ${and} em andamento` : '');
+  }
+
+  gerarConsolidado(status: string): void {
+    if (this.gerando()) return;
+    this.erro.set('');
+    this.gerando.set(true);
+    this.api.getBlob('/pdf/maquinas', { status }).subscribe({
+      next: (blob) => {
+        this.gerando.set(false);
+        this.modal.set(null);
+        window.open(URL.createObjectURL(blob), '_blank');
+      },
+      error: (e) => {
+        this.gerando.set(false);
+        this.erro.set(e?.status === 404 ? 'Nenhuma máquina neste status.' : 'Não foi possível gerar o PDF.');
+      },
+    });
   }
 
   gerar(): void {

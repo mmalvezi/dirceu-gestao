@@ -860,3 +860,98 @@ def pdf_resultado(config, de, ate, recebimentos, total_entradas,
     _nota(pdf, "Repasses da EPR e pagamentos diretos da EPR não entram: "
                "não são receita nem custo do Dirceu.")
     return pdf
+
+
+# ==================== 7) Consolidado de máquinas por status ====================
+
+def pdf_maquinas_consolidado(config, rotulo_status, blocos, totais) -> DirceuPDF:
+    """blocos: [{maquina, ag, margem, pct, entradas(<=10 recentes), mais_n}]."""
+    pdf = DirceuPDF(config, f"Máquinas - {rotulo_status}",
+                    f"{len(blocos)} máquina(s)", rodape_id=f"Máquinas {rotulo_status}")
+
+    for b in blocos:
+        m, ag = b["maquina"], b["ag"]
+        pdf.quebra_se_preciso(30)
+        pdf.ln(1)
+        pdf._losango(MARGIN + 1.5, pdf.get_y() + 3, 1.5)
+        pdf.set_xy(MARGIN + 6, pdf.get_y())
+        pdf.set_font("helvetica", "B", 11)
+        pdf.cell(95, 6, L(m.nome))
+        pdf.set_font("helvetica", "", 8)
+        pdf.set_text_color(*SLATE)
+        pdf.cell(0, 6, L(f"{m.cliente} . {STATUS_LABEL.get(m.status, m.status)}"),
+                 align="R", new_x="LMARGIN", new_y="NEXT")
+        pdf.set_text_color(*INK)
+        pdf.set_font("courier", "B", 9)
+        pdf.set_x(MARGIN + 6)
+        pdf.cell(0, 5.5, L(
+            f"empreita R$ {moeda(m.empreita)}  .  seu custo R$ {moeda(ag.custo_dirceu)}"
+            f"  .  margem R$ {moeda(b['margem'])}  .  {horas_fmt(ag.horas)}h"
+        ), new_x="LMARGIN", new_y="NEXT")
+        if ag.custo_epr > 0:
+            pdf.set_font("helvetica", "", 7.5)
+            pdf.set_text_color(*SLATE)
+            pdf.set_x(MARGIN + 6)
+            pdf.cell(0, 4.5, L(f"EPR pagou R$ {moeda(ag.custo_epr)} (fora da margem)"),
+                     new_x="LMARGIN", new_y="NEXT")
+            pdf.set_text_color(*INK)
+        for e in b["entradas"]:
+            pdf.quebra_se_preciso(6)
+            y = pdf.get_y()
+            pdf.set_font("courier", "", 8)
+            pdf.set_xy(MARGIN + 6, y)
+            pdf.cell(22, 4.8, L(data_br(e.data)))
+            pdf.set_font("helvetica", "", 8)
+            pdf.set_xy(MARGIN + 28, y)
+            desc = e.descricao if len(e.descricao) <= 78 else e.descricao[:78] + "..."
+            pdf.cell(126, 4.8, L(desc))
+            pdf.set_font("courier", "", 8)
+            pdf.set_xy(PAGE_W - MARGIN - 22, y)
+            horas_dia = sum((Decimal(str(t.horas)) for t in e.trabalhos), Decimal("0"))
+            pdf.cell(22, 4.8, L(f"{horas_fmt(horas_dia)}h"), align="R")
+            pdf.set_y(y + 5)
+        if b["mais_n"] > 0:
+            pdf.set_font("helvetica", "I", 7.5)
+            pdf.set_text_color(*SLATE2)
+            pdf.set_x(MARGIN + 6)
+            pdf.cell(0, 4.5, L(f"... e mais {b['mais_n']} lançamento(s)"),
+                     new_x="LMARGIN", new_y="NEXT")
+            pdf.set_text_color(*INK)
+        if not b["entradas"]:
+            pdf.set_font("helvetica", "I", 7.5)
+            pdf.set_text_color(*SLATE2)
+            pdf.set_x(MARGIN + 6)
+            pdf.cell(0, 4.5, L("Sem lançamentos no diário."), new_x="LMARGIN", new_y="NEXT")
+            pdf.set_text_color(*INK)
+        pdf.ln(1.5)
+        _linha_fina(pdf)
+
+    # ---- resumo final ----
+    _sec(pdf, "Resumo")
+    cols = [("Máquina", 46, "L"), ("Empreita", 28, "R"), ("Seu custo", 28, "R"),
+            ("EPR pagou", 28, "R"), ("Margem", 28, "R"), ("Horas", 24, "R")]
+    _tab_header(pdf, cols)
+    for b in blocos:
+        pdf.quebra_se_preciso(7)
+        y = pdf.get_y()
+        m, ag = b["maquina"], b["ag"]
+        pdf.set_font("helvetica", "B", 8)
+        pdf.set_xy(MARGIN, y)
+        pdf.cell(46, 5.5, L(m.nome[:28]))
+        pdf.set_font("courier", "", 8.5)
+        for i, v in enumerate([moeda(m.empreita), moeda(ag.custo_dirceu),
+                               moeda(ag.custo_epr), moeda(b["margem"]),
+                               f"{horas_fmt(ag.horas)}h"]):
+            pdf.set_xy(MARGIN + 46 + 28 * i - (4 if i == 4 else 0), y)
+            pdf.cell(28 if i < 4 else 24, 5.5, L(v), align="R")
+        pdf.set_y(y + 6)
+        _linha_fina(pdf)
+    _total_box(pdf, "Seu custo total", f"R$ {moeda(totais['custo_dirceu'])}")
+    pdf.set_font("helvetica", "", 8.5)
+    pdf.set_text_color(*SLATE)
+    pdf.cell(0, 5, L(
+        f"Empreitas R$ {moeda(totais['empreita'])} . margem total R$ {moeda(totais['margem'])}"
+        f" . EPR pagou R$ {moeda(totais['epr'])} . {horas_fmt(totais['horas'])}h"
+    ), new_x="LMARGIN", new_y="NEXT")
+    pdf.set_text_color(*INK)
+    return pdf
