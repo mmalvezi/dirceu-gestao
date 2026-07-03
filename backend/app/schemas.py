@@ -141,3 +141,71 @@ class DiarioEntradaSalvaOut(DiarioEntradaOut):
 
 class MaquinaDetalheOut(MaquinaOut):
     diario: list[DiarioEntradaOut] = []
+
+
+# ----- Financeiro: recebimentos -----
+
+class RecebimentoCreate(BaseModel):
+    tipo: str = "adiantamento"
+    data: date
+    valor: float
+    maquina_id: int | None = None
+    obs: str | None = None
+
+
+class RecebimentoUpdate(BaseModel):
+    data: date | None = None
+    valor: float | None = None
+    maquina_id: int | None = None
+    obs: str | None = None
+
+
+class RecebimentoOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    tipo: str
+    data: date
+    valor: float
+    maquina_id: int | None
+    maquina_nome: str | None
+    status: str
+    fechamento_id: int | None
+    obs: str | None
+
+
+# ----- Financeiro: verbas de repasse -----
+
+class RepasseCreate(BaseModel):
+    data: date
+    valor: float
+    obs: str | None = None
+
+
+class RepasseUpdate(BaseModel):
+    data: date | None = None
+    valor: float | None = None
+    obs: str | None = None
+
+
+class RepasseOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    data: date
+    valor: float
+    obs: str | None
+
+
+# ----- Financeiro: totais de origem (aba "Acerto & origens") -----
+
+class FinanceiroTotais(BaseModel):
+    periodo_de: date
+    periodo_ate: date
+    repasse_recebido: float       # Σ verbas de repasse no período
+    repasse_pago: float           # Σ trabalhos origem "repasse" no período
+    caixa_repasse: float          # saldo acumulado (TOTAL, sem período)
+    saido_bolso: float            # Σ trabalhos origem "bolso" no período
+    pago_epr_direto: float        # Σ trabalhos origem "epr_direto" no período
+    custo_total_ajudantes: float  # soma das três origens no período
+    adiantado_aberto: float       # Σ adiantamentos "aberto" (TOTAL, posição atual)

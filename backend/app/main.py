@@ -8,7 +8,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
-from app.routers import ajudantes, auth, config as config_router, diario, maquinas
+from app.routers import (
+    ajudantes,
+    auth,
+    config as config_router,
+    diario,
+    financeiro,
+    maquinas,
+    recebimentos,
+    repasses,
+)
 from app.seed import run_seed
 
 
@@ -40,6 +49,9 @@ app.include_router(config_router.router)
 app.include_router(ajudantes.router)
 app.include_router(maquinas.router)
 app.include_router(diario.router)
+app.include_router(recebimentos.router)
+app.include_router(repasses.router)
+app.include_router(financeiro.router)
 
 
 @app.get("/health")
