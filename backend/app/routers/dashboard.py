@@ -185,7 +185,9 @@ def dashboard(
                     f" Há R$ {moeda(aberto)} adiantados a abater —"
                     " que tal agendar o acerto?"
                 )
-            avisos.append(Aviso(nivel="warn", texto=texto))
+            avisos.append(
+                Aviso(nivel="warn", texto=texto, tipo="fechamento_pendente", maquina_id=m.id)
+            )
 
     # hot: andamento com custo >= 60% da empreita (>= 70% = alerta forte).
     for mq in maquinas_dash:
@@ -202,7 +204,9 @@ def dashboard(
                     f" (R$ {moeda(mq.custo)} de R$ {moeda(mq.empreita)})"
                     " e ela ainda está em andamento. Fica de olho na margem."
                 )
-            avisos.append(Aviso(nivel="hot", texto=texto))
+            avisos.append(
+                Aviso(nivel="hot", texto=texto, tipo="custo_alto", maquina_id=mq.id)
+            )
 
     # caixa de repasse (acumulado): sobra -> info; negativo -> hot.
     repasse_recebido_total = _dec(
@@ -218,6 +222,7 @@ def dashboard(
         avisos.append(
             Aviso(
                 nivel="info",
+                tipo="caixa",
                 texto=(
                     f"Repasses da EPR: recebeu R$ {moeda(repasse_recebido_total)}"
                     f" pra repassar e repassou R$ {moeda(repasse_pago_total)} —"
@@ -229,6 +234,7 @@ def dashboard(
         avisos.append(
             Aviso(
                 nivel="hot",
+                tipo="caixa",
                 texto=(
                     "Repasses da EPR: você repassou MAIS do que recebeu —"
                     f" está R$ {moeda(abs(caixa))} no vermelho do próprio bolso."
@@ -252,6 +258,7 @@ def dashboard(
         avisos.append(
             Aviso(
                 nivel="warn",
+                tipo="adiantamento_antigo",
                 texto=(
                     f"Adiantamento de R$ {moeda(a.valor)} está em aberto"
                     f" desde {data_br(a.data)} (há {dias} dias)."

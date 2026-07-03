@@ -339,6 +339,9 @@ class MaquinaAndamentoDash(BaseModel):
 class Aviso(BaseModel):
     nivel: str  # warn / hot / info
     texto: str
+    # Campos p/ tornar o aviso acionável na tela (link/navegação):
+    tipo: str | None = None  # fechamento_pendente / custo_alto / caixa / adiantamento_antigo
+    maquina_id: int | None = None
 
 
 class DashboardOut(BaseModel):
