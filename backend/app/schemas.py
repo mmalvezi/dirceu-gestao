@@ -211,6 +211,19 @@ class FinanceiroTotais(BaseModel):
     adiantado_aberto: float       # Σ adiantamentos "aberto" (TOTAL, posição atual)
 
 
+class PagamentoOut(BaseModel):
+    """Item da lista "Pagos a ajudantes" (derivada do diário)."""
+
+    data: date
+    ajudante_id: int | None
+    ajudante_nome: str
+    maquina_id: int
+    maquina_nome: str
+    horas: float
+    valor: float
+    origem: str
+
+
 # ----- Fechamento -----
 
 class FechamentoMaquina(BaseModel):

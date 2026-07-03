@@ -9,8 +9,8 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import DiarioEntrada, DiarioTrabalho, Recebimento, RepasseEntrada
-from app.schemas import FinanceiroTotais
+from app.models import DiarioEntrada, DiarioTrabalho, Maquina, Recebimento, RepasseEntrada
+from app.schemas import FinanceiroTotais, PagamentoOut
 from app.security import get_current_user
 
 router = APIRouter(
@@ -29,6 +29,47 @@ def _mes_corrente() -> tuple[date, date]:
     de = hoje.replace(day=1)
     ate = hoje.replace(day=monthrange(hoje.year, hoje.month)[1])
     return de, ate
+
+
+@router.get("/pagamentos", response_model=list[PagamentoOut])
+def pagamentos(
+    de: date | None = None,
+    ate: date | None = None,
+    ajudante_id: int | None = None,
+    origem: str | None = None,
+    db: Session = Depends(get_db),
+) -> list[PagamentoOut]:
+    """Lista "Pagos a ajudantes": trabalhos do diário com máquina, por data DESC."""
+    if de is None or ate is None:
+        d0, a0 = _mes_corrente()
+        de = de or d0
+        ate = ate or a0
+
+    query = (
+        db.query(DiarioTrabalho, DiarioEntrada.data, Maquina.id, Maquina.nome)
+        .join(DiarioEntrada, DiarioTrabalho.entrada_id == DiarioEntrada.id)
+        .join(Maquina, DiarioEntrada.maquina_id == Maquina.id)
+        .filter(DiarioEntrada.data >= de, DiarioEntrada.data <= ate)
+    )
+    if ajudante_id is not None:
+        query = query.filter(DiarioTrabalho.ajudante_id == ajudante_id)
+    if origem:
+        query = query.filter(DiarioTrabalho.origem == origem)
+    rows = query.order_by(DiarioEntrada.data.desc(), DiarioTrabalho.id.desc()).all()
+
+    return [
+        PagamentoOut(
+            data=data,
+            ajudante_id=t.ajudante_id,
+            ajudante_nome=t.ajudante_nome,
+            maquina_id=mid,
+            maquina_nome=mnome,
+            horas=float(t.horas),
+            valor=float(t.valor),
+            origem=t.origem,
+        )
+        for t, data, mid, mnome in rows
+    ]
 
 
 @router.get("/totais", response_model=FinanceiroTotais)
