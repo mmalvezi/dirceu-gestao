@@ -1,0 +1,13 @@
+# Backend
+backend/.env
+backend/media/
+.venv/
+__pycache__/
+*.pyc
+
+# Bancos de dados
+*.db
+
+# Frontend
+frontend/node_modules/
+frontend/dist/

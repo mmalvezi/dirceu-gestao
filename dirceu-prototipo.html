@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dirceu — Caldeiraria &amp; Solda · Protótipo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#eef1f3; --card:#ffffff; --iron:#1c242c; --iron-2:#242e38;
+  --ink:#161c22; --slate:#5a6672; --slate-2:#8b95a0; --line:#dde3e8; --surf2:#f4f6f8;
+  --weld:#e05a00; --weld-d:#b84a02; --weld-soft:#fdeee2;
+  --in:#178f52; --in-soft:#e3f4ea;
+  --pass:#2f6bb0; --pass-soft:#e7eff8;
+  --pocket:#c23a2e; --pocket-soft:#fbe9e7;
+  --warn:#b7791f; --warn-soft:#fdf3e0;
+  --r:12px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{font-family:'Barlow',system-ui,sans-serif;background:var(--bg);color:var(--ink);font-size:15px;line-height:1.45}
+.mono{font-family:ui-monospace,'Cascadia Mono','SF Mono',Menlo,monospace}
+.disp{font-family:'Barlow Semi Condensed',sans-serif}
+button{font-family:inherit;cursor:pointer}
+
+/* ===== layout base ===== */
+.app{display:flex;min-height:100vh}
+.sidebar{display:none}
+.main{flex:1;min-width:0;padding:18px 16px 92px}
+.screen{display:none;max-width:1060px;margin:0 auto}
+.screen.active{display:block}
+
+/* topo mobile */
+.mtop{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.brand{display:flex;align-items:center;gap:10px}
+.brand .mark{width:38px;height:38px;border-radius:9px;background:var(--iron);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
+.brand .mark::after{content:"";position:absolute;width:16px;height:16px;background:var(--weld);transform:rotate(45deg);bottom:-9px;right:-9px}
+.brand .mark span{color:#fff;font-weight:700;font-size:15px;font-family:'Barlow Semi Condensed'}
+.brand h1{font-size:17px;font-weight:600;font-family:'Barlow Semi Condensed';letter-spacing:.01em}
+.brand small{display:block;font-size:11.5px;color:var(--slate);font-weight:400;font-family:'Barlow'}
+
+/* tab bar mobile */
+.tabbar{position:fixed;bottom:0;left:0;right:0;background:var(--iron);display:flex;z-index:40;padding-bottom:env(safe-area-inset-bottom)}
+.tabbar button{flex:1;background:none;border:0;color:#93a0ac;padding:9px 2px 8px;font-size:10.5px;display:flex;flex-direction:column;align-items:center;gap:3px;font-weight:500}
+.tabbar button svg{width:21px;height:21px}
+.tabbar button.on{color:#fff}
+.tabbar button.on svg{color:var(--weld);stroke:var(--weld)}
+
+/* ===== desktop ===== */
+@media(min-width:900px){
+  .main{padding:26px 30px 40px}
+  .tabbar{display:none}
+  .mtop .brand{display:none}
+  .sidebar{display:flex;flex-direction:column;width:224px;background:var(--iron);color:#c6ced6;position:sticky;top:0;height:100vh;padding:20px 14px;flex-shrink:0}
+  .sidebar .brand{margin:0 6px 26px}
+  .sidebar .brand h1{color:#fff}
+  .sidebar .brand small{color:#8b98a4}
+  .snav{display:flex;flex-direction:column;gap:4px}
+  .snav button{display:flex;align-items:center;gap:11px;background:none;border:0;color:#aeb9c4;padding:10px 12px;border-radius:9px;font-size:14.5px;font-weight:500;text-align:left}
+  .snav button svg{width:19px;height:19px}
+  .snav button.on{background:var(--iron-2);color:#fff;box-shadow:inset 3px 0 0 var(--weld)}
+  .sfoot{margin-top:auto;font-size:11.5px;color:#77828d;padding:0 12px}
+}
+
+/* ===== componentes ===== */
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px}
+.h-sec{font-family:'Barlow Semi Condensed';font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--weld-d);margin:22px 0 10px}
+.h-sec:first-child{margin-top:0}
+.grid{display:grid;gap:12px}
+@media(min-width:640px){.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:repeat(3,1fr)}.g4{grid-template-columns:repeat(4,1fr)}}
+
+.kpi{padding:14px 16px}
+.kpi .lb{font-size:12px;color:var(--slate);font-weight:500}
+.kpi .v{font-family:'Barlow Semi Condensed';font-size:26px;font-weight:700;margin-top:2px;letter-spacing:.01em}
+.kpi .s{font-size:12px;color:var(--slate-2);margin-top:2px}
+.kpi.hl{background:var(--iron);border-color:var(--iron)}
+.kpi.hl .lb{color:#9fb0bd}.kpi.hl .v{color:#fff}.kpi.hl .s{color:#8b98a4}
+
+.chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:3px 9px;border-radius:99px;letter-spacing:.02em}
+.chip::before{content:"";width:7px;height:7px;border-radius:2px;transform:rotate(45deg)}
+.c-epr{background:var(--pass-soft);color:var(--pass)}.c-epr::before{background:var(--pass)}
+.c-rep{background:var(--pass-soft);color:var(--pass)}.c-rep::before{background:var(--pass)}
+.c-bolso{background:var(--pocket-soft);color:var(--pocket)}.c-bolso::before{background:var(--pocket)}
+.c-in{background:var(--in-soft);color:var(--in)}.c-in::before{background:var(--in)}
+.c-warn{background:var(--warn-soft);color:var(--warn)}.c-warn::before{background:var(--warn)}
+.c-neutral{background:var(--surf2);color:var(--slate)}.c-neutral::before{background:var(--slate-2)}
+
+.badge{display:inline-block;font-size:11px;font-weight:600;padding:3px 9px;border-radius:6px}
+.b-and{background:var(--weld-soft);color:var(--weld-d)}
+.b-fin{background:var(--warn-soft);color:var(--warn)}
+.b-fech{background:var(--in-soft);color:var(--in)}
+
+.bar{height:7px;background:var(--surf2);border-radius:99px;overflow:hidden}
+.bar i{display:block;height:100%;border-radius:99px;background:var(--weld)}
+.bar i.ok{background:var(--in)}.bar i.hot{background:var(--pocket)}
+
+.btn{border:0;border-radius:9px;padding:10px 16px;font-weight:600;font-size:14px;display:inline-flex;align-items:center;gap:7px}
+.btn svg{width:16px;height:16px}
+.btn-p{background:var(--weld);color:#fff}
+.btn-g{background:var(--iron);color:#fff}
+.btn-o{background:#fff;border:1px solid var(--line);color:var(--ink)}
+.btn-s{padding:7px 12px;font-size:13px}
+
+.list{display:flex;flex-direction:column}
+.list>div{padding:12px 0;border-bottom:1px solid var(--line)}
+.list>div:last-child{border-bottom:0;padding-bottom:2px}
+.list>div:first-child{padding-top:2px}
+.row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.muted{color:var(--slate);font-size:12.5px}
+.tiny{color:var(--slate-2);font-size:11.5px}
+.val{font-family:ui-monospace,Menlo,monospace;font-weight:600}
+.pos{color:var(--in)}.neg{color:var(--pocket)}
+
+.alert{display:flex;gap:10px;padding:11px 13px;border-radius:10px;font-size:13.5px;align-items:flex-start;margin-bottom:8px}
+.alert svg{width:17px;height:17px;flex-shrink:0;margin-top:1px}
+.a-warn{background:var(--warn-soft);color:#7a5210}
+.a-info{background:var(--pass-soft);color:#1f4a7d}
+.a-hot{background:var(--pocket-soft);color:#8c2a21}
+
+/* barras horas */
+.hours{display:flex;align-items:flex-end;gap:8px;height:110px;padding-top:6px}
+.hours .d{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;height:100%;justify-content:flex-end}
+.hours .d i{width:100%;max-width:34px;background:var(--iron);border-radius:5px 5px 0 0;min-height:3px}
+.hours .d.today i{background:var(--weld)}
+.hours .d b{font-size:11px;color:var(--slate);font-weight:500}
+.hours .d span{font-size:10.5px;color:var(--slate-2)}
+
+/* máquina card */
+.mq{cursor:pointer;transition:border-color .15s}
+.mq:hover{border-color:var(--weld)}
+.mq .top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px}
+.mq h3{font-family:'Barlow Semi Condensed';font-size:17px;font-weight:600}
+.mq .cli{font-size:12.5px;color:var(--slate)}
+.mq .nums{display:flex;gap:16px;margin:10px 0 8px;flex-wrap:wrap}
+.mq .nums div b{display:block;font-size:11px;color:var(--slate-2);font-weight:500}
+.mq .nums div span{font-family:ui-monospace,Menlo,monospace;font-size:13.5px;font-weight:600}
+
+/* diário */
+.day{border-left:3px solid var(--line);padding-left:14px;position:relative;margin-left:4px}
+.day::before{content:"";position:absolute;left:-7px;top:4px;width:11px;height:11px;border-radius:3px;transform:rotate(45deg);background:var(--weld)}
+.day+.day{margin-top:18px}
+.day .dt{font-family:'Barlow Semi Condensed';font-weight:600;font-size:14px}
+.day .desc{margin:3px 0 8px;font-size:14px}
+.worker{display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--surf2);border-radius:9px;padding:8px 11px;margin-top:6px;flex-wrap:wrap}
+.worker .nm{font-weight:600;font-size:13.5px}
+.worker .hs{font-size:12px;color:var(--slate)}
+.worker .right{display:flex;align-items:center;gap:8px}
+
+/* segmented */
+.seg{display:flex;background:var(--surf2);border-radius:10px;padding:4px;gap:4px;margin-bottom:14px;overflow:auto}
+.seg button{flex:1;border:0;background:none;padding:8px 12px;border-radius:8px;font-weight:600;font-size:13px;color:var(--slate);white-space:nowrap}
+.seg button.on{background:#fff;color:var(--ink);box-shadow:0 1px 3px rgba(20,28,36,.12)}
+
+/* fechamento régua */
+.regua{margin:14px 0}
+.regua .lbls{display:flex;justify-content:space-between;font-size:12px;color:var(--slate);margin-bottom:5px}
+.regua .track{height:26px;background:var(--surf2);border-radius:8px;overflow:hidden;display:flex}
+.regua .track .dev{background:var(--in);height:100%}
+.regua .track .adv{background:var(--warn);height:100%}
+.legend{display:flex;gap:14px;margin-top:8px;font-size:12px;color:var(--slate);flex-wrap:wrap}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+
+/* relatórios */
+.rep{display:flex;align-items:center;gap:13px}
+.rep .ic{width:42px;height:42px;border-radius:10px;background:var(--weld-soft);color:var(--weld-d);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.rep .ic svg{width:21px;height:21px}
+.rep h4{font-size:14.5px;font-weight:600}
+.rep p{font-size:12.5px;color:var(--slate)}
+
+/* fab */
+.fab{position:fixed;right:16px;bottom:76px;z-index:35;background:var(--weld);color:#fff;border:0;border-radius:14px;padding:13px 18px;font-weight:700;font-size:14px;box-shadow:0 6px 18px rgba(224,90,0,.4);display:none;align-items:center;gap:7px}
+.fab svg{width:18px;height:18px}
+@media(min-width:900px){.fab{bottom:28px;right:28px}}
+
+/* modal demo */
+.modal-bg{position:fixed;inset:0;background:rgba(16,22,28,.55);z-index:60;display:none;align-items:flex-end;justify-content:center}
+.modal-bg.open{display:flex}
+@media(min-width:640px){.modal-bg{align-items:center}}
+.modal{background:#fff;border-radius:16px 16px 0 0;width:100%;max-width:520px;max-height:88vh;overflow:auto;padding:20px}
+@media(min-width:640px){.modal{border-radius:16px}}
+.modal h3{font-family:'Barlow Semi Condensed';font-size:18px;margin-bottom:4px}
+.modal .muted{margin-bottom:14px}
+.f{margin-bottom:12px}
+.f label{display:block;font-size:12px;font-weight:600;color:var(--slate);margin-bottom:5px}
+.f input,.f select,.f textarea{width:100%;border:1px solid var(--line);border-radius:9px;padding:10px 12px;font-family:inherit;font-size:14px;background:#fff}
+.f-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.demo-note{background:var(--weld-soft);color:var(--weld-d);font-size:12px;padding:8px 12px;border-radius:8px;margin-top:8px;font-weight:500}
+
+.back{display:inline-flex;align-items:center;gap:6px;background:none;border:0;color:var(--slate);font-weight:600;font-size:13.5px;margin-bottom:12px;padding:4px 0}
+.back svg{width:16px;height:16px}
+
+.wa-box{background:var(--iron);border-radius:12px;padding:14px;color:#dfe6ec;font-size:12.5px;white-space:pre-wrap;font-family:ui-monospace,Menlo,monospace;line-height:1.55;margin-top:10px}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- SIDEBAR DESKTOP -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="mark"><span>DC</span></div>
+      <div><h1>Dirceu</h1><small>Caldeiraria &amp; Solda</small></div>
+    </div>
+    <nav class="snav" id="snav"></nav>
+    <div class="sfoot">Protótipo de validação<br>Malvezi Sistemas</div>
+  </aside>
+
+  <main class="main">
+    <div class="mtop">
+      <div class="brand">
+        <div class="mark"><span>DC</span></div>
+        <div><h1>Dirceu</h1><small>Caldeiraria &amp; Solda</small></div>
+      </div>
+      <span class="chip c-neutral" id="hoje-chip">qua, 01/07</span>
+    </div>
+    <div id="screens"></div>
+  </main>
+</div>
+
+<nav class="tabbar" id="tabbar"></nav>
+<button class="fab" id="fab" onclick="openModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg> Lançar dia</button>
+
+<div class="modal-bg" id="modalbg" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <h3>Lançar dia de trabalho</h3>
+    <div class="muted">Jato E120 — Metalúrgica Santa Fé</div>
+    <div class="f"><label>Data</label><input type="date" value="2026-07-01"></div>
+    <div class="f"><label>O que foi feito</label><textarea rows="2" placeholder="Ex.: solda das cantoneiras internas e troca dos bicos"></textarea></div>
+    <div class="f"><label>Quem trabalhou</label>
+      <div class="worker"><div><div class="nm">Carlão</div><div class="hs"><input style="width:52px;border:1px solid var(--line);border-radius:6px;padding:3px 6px" value="8"> h &nbsp;·&nbsp; R$ <input style="width:70px;border:1px solid var(--line);border-radius:6px;padding:3px 6px" value="160"></div></div>
+        <select style="border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-size:12px"><option>Repasse EPR</option><option>EPR direto</option><option>Do bolso</option></select>
+      </div>
+      <button class="btn btn-o btn-s" style="margin-top:8px">+ ajudante</button>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+      <button class="btn btn-o" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-p" onclick="closeModal()">Salvar dia</button>
+    </div>
+    <div class="demo-note">Protótipo: esta tela é demonstrativa — no sistema final, o lançamento alimenta o diário, os custos da máquina, o financeiro e os relatórios de uma vez.</div>
+  </div>
+</div>
+
+<div id="tpl"></div>
+<script>
+/* ===================== DADOS DE EXEMPLO ===================== */
+const fmt = v => 'R$ ' + v.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const ICONS = {
+  home:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>',
+  mach:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="7" width="18" height="12" rx="2"/><path d="M7 7V4h10v3M8 13h.01M12 13h.01M16 13h.01"/></svg>',
+  fin:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2.5" y="6" width="19" height="12" rx="2.5"/><circle cx="12" cy="12" r="2.6"/></svg>',
+  fech:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12.5l2 2 4-4.5"/><circle cx="12" cy="12" r="9"/></svg>',
+  rep:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9.5 13h6M9.5 16.5h6"/></svg>',
+  alert:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8.5v4.5M12 16.5h.01"/><path d="M10.3 3.8 2.6 17a2 2 0 0 0 1.7 3h15.4a2 2 0 0 0 1.7-3L13.7 3.8a2 2 0 0 0-3.4 0z"/></svg>',
+  pdf:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5"/></svg>'
+};
+
+const state = { screen:'inicio', maquina:null, finTab:'receb' };
+
+const MAQ = [
+ {id:1,nome:'Jato E120',cli:'Metalúrgica Santa Fé',status:'and',empreita:6500,custo:2840,horas:64,
+  diario:[
+   {d:'qua, 01/07',desc:'Jateamento de teste e ajuste de pressão da câmara',w:[{n:'Índio',h:7,v:140,o:'epr'}]},
+   {d:'ter, 30/06',desc:'Solda das cantoneiras internas e troca dos bicos',w:[{n:'Carlão',h:9,v:180,o:'rep'},{n:'Zé Roberto',h:6,v:150,o:'bolso'}]},
+   {d:'seg, 29/06',desc:'Desmontagem do painel e lixamento da câmara',w:[{n:'Carlão',h:8,v:160,o:'rep'},{n:'Índio',h:8,v:160,o:'rep'}]},
+  ]},
+ {id:2,nome:'Prensa P-200',cli:'EPR (interna)',status:'and',empreita:8900,custo:5610,horas:132,
+  diario:[
+   {d:'seg, 29/06',desc:'Reforço da mesa inferior — chapa 1/2" soldada e esmerilhada',w:[{n:'Carlão',h:8,v:160,o:'rep'},{n:'Marquinho',h:8,v:170,o:'bolso'}]},
+   {d:'sex, 26/06',desc:'Desempeno do cabeçote e troca das guias',w:[{n:'Marquinho',h:9,v:190,o:'bolso'},{n:'Índio',h:7,v:140,o:'rep'}]},
+  ]},
+ {id:3,nome:'Caldeira CB-40',cli:'Usina São João',status:'fin',empreita:12000,custo:7150,horas:210,
+  diario:[
+   {d:'sex, 19/06',desc:'Teste hidrostático final e liberação',w:[{n:'Carlão',h:6,v:120,o:'rep'},{n:'Zé Roberto',h:6,v:150,o:'bolso'}]},
+  ]},
+ {id:4,nome:'Esteira TR-8',cli:'Metalúrgica Santa Fé',status:'fech',empreita:3200,custo:1890,horas:58,
+  diario:[
+   {d:'ter, 09/06',desc:'Alinhamento final dos roletes e entrega',w:[{n:'Índio',h:5,v:100,o:'rep'}]},
+  ]},
+];
+const ST = {and:['Em andamento','b-and'],fin:['Finalizada · aguardando fechamento','b-fin'],fech:['Fechada e recebida','b-fech']};
+const ORG = {epr:['EPR direto','c-epr'],rep:['Repasse EPR','c-rep'],bolso:['Do bolso','c-bolso']};
+
+const RECEB = [
+ {d:'22/06',tipo:'Adiantamento',mq:'Jato E120',v:2000,aberto:true},
+ {d:'15/06',tipo:'Adiantamento',mq:'Caldeira CB-40',v:5000,aberto:true},
+ {d:'10/06',tipo:'Fechamento',mq:'Esteira TR-8',v:3200,aberto:false},
+];
+const PAGTOS = [
+ {d:'01/07',n:'Índio',mq:'Jato E120',v:140,o:'epr'},
+ {d:'30/06',n:'Carlão',mq:'Jato E120',v:180,o:'rep'},
+ {d:'30/06',n:'Zé Roberto',mq:'Jato E120',v:150,o:'bolso'},
+ {d:'29/06',n:'Carlão',mq:'Jato E120',v:160,o:'rep'},
+ {d:'29/06',n:'Índio',mq:'Jato E120',v:160,o:'rep'},
+ {d:'29/06',n:'Carlão',mq:'Prensa P-200',v:160,o:'rep'},
+ {d:'29/06',n:'Marquinho',mq:'Prensa P-200',v:170,o:'bolso'},
+];
+
+/* ===================== TELAS ===================== */
+function scrInicio(){
+  return `
+  <section class="screen active">
+    <div class="h-sec">Esta semana · 29/06 a 05/07</div>
+    <div class="grid g4">
+      <div class="card kpi hl"><div class="lb">Horas lançadas</div><div class="v">46 h</div><div class="s">4 ajudantes em campo</div></div>
+      <div class="card kpi"><div class="lb">Pago a ajudantes</div><div class="v mono">R$ 1.120</div><div class="s"><span style="color:var(--pass)">R$ 800 repasse</span> · <span style="color:var(--pocket)">R$ 320 bolso</span></div></div>
+      <div class="card kpi"><div class="lb">Adiantado em aberto</div><div class="v mono">R$ 7.000</div><div class="s">2 adiantamentos a abater</div></div>
+      <div class="card kpi"><div class="lb">A receber (fechamento)</div><div class="v mono pos">R$ 7.000</div><div class="s">CB-40 finalizada · 12.000 − 5.000</div></div>
+    </div>
+
+    <div class="h-sec">Avisos</div>
+    <div class="alert a-warn">${ICONS.alert}<div><b>Caldeira CB-40</b> está finalizada há 12 dias sem fechamento. Há R$ 5.000 adiantados a abater — que tal agendar o acerto com o Elessandro?</div></div>
+    <div class="alert a-hot">${ICONS.alert}<div><b>Prensa P-200</b>: o custo chegou a <b>63% da empreita</b> (R$ 5.610 de R$ 8.900) e ela ainda está em andamento. Fica de olho na margem.</div></div>
+    <div class="alert a-info">${ICONS.alert}<div>Repasses da EPR: recebeu <b>R$ 1.200</b> para pagar ajudantes e repassou <b>R$ 1.140</b> — sobram <span class="val">R$ 60</span> em caixa de repasse.</div></div>
+
+    <div class="grid g2" style="margin-top:18px">
+      <div class="card">
+        <div class="h-sec" style="margin-top:0">Horas por dia</div>
+        <div class="hours">
+          ${[['seg',16],['ter',15],['qua',7,true],['qui',0],['sex',8],['sáb',0],['dom',0]].map(([d,h,t])=>`
+            <div class="d ${t?'today':''}"><i style="height:${h?Math.max(h/16*100,4):3}%"></i><b>${d}</b><span>${h||'—'}${h?'h':''}</span></div>`).join('')}
+        </div>
+      </div>
+      <div class="card">
+        <div class="h-sec" style="margin-top:0">Margem das máquinas em andamento</div>
+        <div class="list">
+          ${MAQ.filter(m=>m.status!=='fech').map(m=>{
+            const pct=Math.round(m.custo/m.empreita*100);
+            return `<div><div class="row"><b>${m.nome}</b><span class="muted">${pct}% da empreita</span></div>
+            <div class="bar" style="margin-top:6px"><i class="${pct>70?'hot':pct>45?'':'ok'}" style="width:${pct}%"></i></div>
+            <div class="tiny" style="margin-top:4px">custo ${fmt(m.custo)} · empreita ${fmt(m.empreita)} · margem hoje <b class="val pos">${fmt(m.empreita-m.custo)}</b></div></div>`;
+          }).join('')}
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:14px">
+      <div class="row"><div class="h-sec" style="margin:0">Resumo da semana (WhatsApp)</div>
+      <button class="btn btn-g btn-s" onclick="copyWA(this)">Copiar</button></div>
+      <div class="wa-box" id="wa-text">*Resumo semana 29/06–05/07 — Dirceu*
+Máquinas em andamento: Jato E120 (44%), Prensa P-200 (63%)
+Finalizada aguardando fechamento: Caldeira CB-40
+Horas da equipe: 46h
+Pago a ajudantes: R$ 1.120 (R$ 800 repasse EPR / R$ 320 do bolso)
+Adiantado em aberto: R$ 7.000
+A receber no fechamento da CB-40: R$ 7.000</div>
+    </div>
+  </section>`;
+}
+
+function scrMaquinas(){
+  return `<section class="screen active">
+    <div class="row" style="margin-bottom:12px"><div class="h-sec" style="margin:0">Máquinas · empreitas</div>
+    <button class="btn btn-p btn-s" onclick="openModal()">+ Nova máquina</button></div>
+    <div class="grid g2">
+    ${MAQ.map(m=>{
+      const pct=Math.round(m.custo/m.empreita*100);
+      return `<div class="card mq" onclick="go('maquina',${m.id})">
+        <div class="top"><div><h3>${m.nome}</h3><div class="cli">${m.cli}</div></div>
+        <span class="badge ${ST[m.status][1]}">${ST[m.status][0]}</span></div>
+        <div class="bar"><i class="${pct>70?'hot':pct>45?'':'ok'}" style="width:${Math.min(pct,100)}%"></i></div>
+        <div class="nums">
+          <div><b>Empreita</b><span>${fmt(m.empreita)}</span></div>
+          <div><b>Custo até agora</b><span>${fmt(m.custo)}</span></div>
+          <div><b>Margem</b><span class="pos">${fmt(m.empreita-m.custo)}</span></div>
+          <div><b>Horas</b><span>${m.horas}h</span></div>
+        </div>
+        <div class="tiny">Último lançamento: ${m.diario[0].d} — ${m.diario[0].desc.slice(0,48)}…</div>
+      </div>`;
+    }).join('')}
+    </div>
+  </section>`;
+}
+
+function scrMaquina(){
+  const m = MAQ.find(x=>x.id===state.maquina) || MAQ[0];
+  const pct=Math.round(m.custo/m.empreita*100);
+  return `<section class="screen active">
+    <button class="back" onclick="go('maquinas')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M15 5l-7 7 7 7"/></svg> Máquinas</button>
+    <div class="card">
+      <div class="top row" style="align-items:flex-start">
+        <div><h3 class="disp" style="font-size:20px">${m.nome}</h3><div class="cli muted">${m.cli}</div></div>
+        <span class="badge ${ST[m.status][1]}">${ST[m.status][0]}</span>
+      </div>
+      <div class="grid g4" style="margin-top:12px">
+        <div><b class="tiny">EMPREITA</b><div class="val" style="font-size:17px">${fmt(m.empreita)}</div></div>
+        <div><b class="tiny">CUSTO ATÉ AGORA</b><div class="val" style="font-size:17px">${fmt(m.custo)}</div></div>
+        <div><b class="tiny">MARGEM HOJE</b><div class="val pos" style="font-size:17px">${fmt(m.empreita-m.custo)}</div></div>
+        <div><b class="tiny">HORAS</b><div class="val" style="font-size:17px">${m.horas}h</div></div>
+      </div>
+      <div class="bar" style="margin-top:12px"><i class="${pct>70?'hot':pct>45?'':'ok'}" style="width:${Math.min(pct,100)}%"></i></div>
+      <div class="tiny" style="margin-top:5px">${pct}% da empreita consumida em custos</div>
+      <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+        <button class="btn btn-p btn-s" onclick="openModal()">+ Lançar dia</button>
+        <button class="btn btn-o btn-s" onclick="pdfDemo('Relatório da máquina ${m.nome}')">${ICONS.pdf} PDF da máquina</button>
+      </div>
+    </div>
+    <div class="h-sec">Diário de obra</div>
+    ${m.diario.map(dd=>`
+      <div class="day">
+        <div class="dt">${dd.d}</div>
+        <div class="desc">${dd.desc}</div>
+        ${dd.w.map(w=>`<div class="worker">
+          <div><span class="nm">${w.n}</span> <span class="hs">· ${w.h}h</span></div>
+          <div class="right"><span class="chip ${ORG[w.o][1]}">${ORG[w.o][0]}</span><span class="val">${fmt(w.v)}</span></div>
+        </div>`).join('')}
+      </div>`).join('')}
+  </section>`;
+}
+
+function scrFinanceiro(){
+  const t=state.finTab;
+  let body='';
+  if(t==='receb'){
+    body = `<div class="list">${RECEB.map(r=>`
+      <div class="row"><div><b>${r.tipo}</b> — ${r.mq}<div class="tiny">${r.d}/2026</div></div>
+      <div style="text-align:right"><div class="val pos">${fmt(r.v)}</div>
+      <span class="chip ${r.aberto?'c-warn':'c-in'}">${r.aberto?'em aberto':'quitado'}</span></div></div>`).join('')}</div>
+      <div class="alert a-info" style="margin-top:12px">${ICONS.alert}<div>Adiantamentos <b>em aberto</b> são abatidos automaticamente quando você gera o fechamento do período.</div></div>`;
+  } else if(t==='pagto'){
+    body = `<div class="list">${PAGTOS.map(p=>`
+      <div class="row"><div><b>${p.n}</b> — ${p.mq}<div class="tiny">${p.d}/2026</div></div>
+      <div style="text-align:right"><div class="val neg">− ${fmt(p.v)}</div>
+      <span class="chip ${ORG[p.o][1]}">${ORG[p.o][0]}</span></div></div>`).join('')}</div>`;
+  } else {
+    body = `
+      <div class="grid g3">
+        <div class="card kpi"><div class="lb">EPR mandou p/ repasse</div><div class="v mono" style="font-size:20px">R$ 1.200</div></div>
+        <div class="card kpi"><div class="lb">Você repassou</div><div class="v mono" style="font-size:20px">R$ 1.140</div></div>
+        <div class="card kpi"><div class="lb">Em caixa de repasse</div><div class="v mono pos" style="font-size:20px">R$ 60</div></div>
+      </div>
+      <div class="grid g3" style="margin-top:10px">
+        <div class="card kpi"><div class="lb">Saiu do seu bolso (jun)</div><div class="v mono neg" style="font-size:20px">R$ 890</div><div class="s">a considerar no acerto</div></div>
+        <div class="card kpi"><div class="lb">Pago pela EPR direto</div><div class="v mono" style="font-size:20px">R$ 140</div><div class="s">não passa pela sua mão</div></div>
+        <div class="card kpi"><div class="lb">Custo total ajudantes (jun)</div><div class="v mono" style="font-size:20px">R$ 2.170</div></div>
+      </div>
+      <div class="alert a-warn" style="margin-top:12px">${ICONS.alert}<div>O sistema separa <b>quem pagou cada diária</b>: o que é repasse não é custo seu; o que saiu do bolso entra no seu acerto. É essa separação que evita confusão no fechamento.</div></div>`;
+  }
+  return `<section class="screen active">
+    <div class="h-sec">Financeiro</div>
+    <div class="seg">
+      <button class="${t==='receb'?'on':''}" onclick="finTab('receb')">Recebimentos</button>
+      <button class="${t==='pagto'?'on':''}" onclick="finTab('pagto')">Pagos a ajudantes</button>
+      <button class="${t==='acerto'?'on':''}" onclick="finTab('acerto')">Acerto &amp; origens</button>
+    </div>
+    ${body}
+    <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-p btn-s" onclick="openModal()">+ Lançamento</button>
+      <button class="btn btn-o btn-s" onclick="pdfDemo('Relatório financeiro do período')">${ICONS.pdf} PDF do período</button>
+    </div>
+  </section>`;
+}
+
+function scrFechamento(){
+  return `<section class="screen active">
+    <div class="h-sec">Fechamento com a EPR</div>
+    <div class="card">
+      <div class="f-2">
+        <div class="f"><label>De</label><input type="date" value="2026-06-01"></div>
+        <div class="f"><label>Até</label><input type="date" value="2026-07-01"></div>
+      </div>
+      <div class="muted" style="margin-bottom:10px">Entram no período: máquinas <b>finalizadas</b> e os <b>adiantamentos em aberto</b> vinculados.</div>
+      <div class="list">
+        <div class="row"><div><b>Caldeira CB-40</b> — Usina São João<div class="tiny">finalizada em 19/06 · empreita integral</div></div><span class="val pos">${fmt(12000)}</span></div>
+        <div class="row"><div><b>Adiantamento 15/06</b> — CB-40<div class="tiny">abatido no fechamento</div></div><span class="val neg">− ${fmt(5000)}</span></div>
+      </div>
+      <div class="regua">
+        <div class="lbls"><span>Devido no período: <b class="val">R$ 12.000</b></span><span>Já adiantado: <b class="val">R$ 5.000</b></span></div>
+        <div class="track"><div class="adv" style="width:41.6%"></div><div class="dev" style="width:58.4%"></div></div>
+        <div class="legend"><span><i style="background:var(--warn)"></i>Adiantado (abate)</span><span><i style="background:var(--in)"></i>Saldo a receber</span></div>
+      </div>
+      <div class="row" style="background:var(--iron);border-radius:11px;padding:13px 15px">
+        <b style="color:#fff" class="disp">SALDO A RECEBER</b><span class="val" style="color:#fff;font-size:19px">${fmt(7000)}</span>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+        <button class="btn btn-p" onclick="pdfDemo('Fechamento 01/06–01/07 — PDF pronto para apresentar ao Elessandro')">${ICONS.pdf} Gerar PDF do fechamento</button>
+        <button class="btn btn-o" onclick="pdfDemo('Fechamento registrado — adiantamentos quitados')">Registrar acerto</button>
+      </div>
+    </div>
+    <div class="alert a-info" style="margin-top:12px">${ICONS.alert}<div>Sem data fixa, sem problema: os adiantamentos ficam <b>em aberto</b> até você gerar o fechamento — seja no fim do mês ou três meses depois. Nada se perde.</div></div>
+  </section>`;
+}
+
+function scrRelatorios(){
+  const reps=[
+    ['Relatório por máquina','Diário completo, custos, horas e margem de uma máquina.'],
+    ['Relatório do período (todas)','Tudo que rodou no período, consolidado máquina a máquina.'],
+    ['Saídas — ajudantes','Quanto cada ajudante recebeu, com a origem de cada pagamento.'],
+    ['Entradas — recebimentos','Adiantamentos e fechamentos recebidos da EPR.'],
+    ['Fechamento','O confronto: finalizado no período × adiantado. Pronto pra apresentar.'],
+  ];
+  return `<section class="screen active">
+    <div class="h-sec">Relatórios em PDF</div>
+    <div class="grid g2">
+      ${reps.map(r=>`<div class="card rep"><div class="ic">${ICONS.rep}</div>
+        <div style="flex:1"><h4>${r[0]}</h4><p>${r[1]}</p></div>
+        <button class="btn btn-o btn-s" onclick="pdfDemo('${r[0]}')">${ICONS.pdf} PDF</button></div>`).join('')}
+    </div>
+    <div class="alert a-info" style="margin-top:12px">${ICONS.alert}<div>Todos os relatórios aceitam filtro de <b>período</b> e, quando faz sentido, de <b>máquina</b> e <b>ajudante</b>. No sistema final saem em PDF com o cabeçalho do Dirceu.</div></div>
+  </section>`;
+}
+
+/* ===================== NAVEGAÇÃO ===================== */
+const NAV = [
+  ['inicio','Início',ICONS.home],
+  ['maquinas','Máquinas',ICONS.mach],
+  ['financeiro','Financeiro',ICONS.fin],
+  ['fechamento','Fechamento',ICONS.fech],
+  ['relatorios','Relatórios',ICONS.rep],
+];
+function render(){
+  const scr = {inicio:scrInicio,maquinas:scrMaquinas,maquina:scrMaquina,financeiro:scrFinanceiro,fechamento:scrFechamento,relatorios:scrRelatorios}[state.screen];
+  document.getElementById('screens').innerHTML = scr();
+  const navKey = state.screen==='maquina'?'maquinas':state.screen;
+  document.getElementById('tabbar').innerHTML = NAV.map(n=>`<button class="${n[0]===navKey?'on':''}" onclick="go('${n[0]}')">${n[2]}<span>${n[1]}</span></button>`).join('');
+  document.getElementById('snav').innerHTML = NAV.map(n=>`<button class="${n[0]===navKey?'on':''}" onclick="go('${n[0]}')">${n[2]}<span>${n[1]}</span></button>`).join('');
+  document.getElementById('fab').style.display = (state.screen==='maquina'||state.screen==='maquinas')?'inline-flex':'none';
+  window.scrollTo({top:0});
+}
+function go(s,id){ state.screen=s; if(id)state.maquina=id; render(); }
+function finTab(t){ state.finTab=t; render(); }
+function openModal(){ document.getElementById('modalbg').classList.add('open'); }
+function closeModal(){ document.getElementById('modalbg').classList.remove('open'); }
+function pdfDemo(t){ alert('📄 ' + t + '\n\n(No sistema final, aqui baixa o PDF pronto.)'); }
+function copyWA(btn){
+  navigator.clipboard.writeText(document.getElementById('wa-text').innerText).then(()=>{
+    btn.textContent='Copiado ✓'; setTimeout(()=>btn.textContent='Copiar',1600);
+  });
+}
+render();
+</script>
+</body>
+</html>

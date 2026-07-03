@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+alembic
+pydantic-settings
+python-multipart
+bcrypt
+PyJWT
+Pillow
+fpdf2
+psycopg2-binary
