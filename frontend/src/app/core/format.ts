@@ -54,3 +54,16 @@ export function todayIso(): string {
   const dd = String(d.getDate()).padStart(2, '0');
   return `${d.getFullYear()}-${mm}-${dd}`;
 }
+
+/** Primeiro dia do mês corrente como 'YYYY-MM-DD'. */
+export function primeiroDiaMesIso(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+}
+
+/** Primeiro dia do mês ANTERIOR como 'YYYY-MM-DD'. */
+export function primeiroDiaMesAnteriorIso(): string {
+  const d = new Date();
+  const m = new Date(d.getFullYear(), d.getMonth() - 1, 1);
+  return `${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, '0')}-01`;
+}

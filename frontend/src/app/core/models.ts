@@ -95,6 +95,17 @@ export interface RepasseEntrada {
   obs: string | null;
 }
 
+export interface Pagamento {
+  data: string;
+  ajudante_id: number | null;
+  ajudante_nome: string;
+  maquina_id: number;
+  maquina_nome: string;
+  horas: number;
+  valor: number;
+  origem: Origem;
+}
+
 export interface FinanceiroTotais {
   periodo_de: string;
   periodo_ate: string;

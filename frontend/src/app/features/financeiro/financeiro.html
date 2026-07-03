@@ -1,0 +1,201 @@
+<section class="screen">
+  <div class="h-sec">Financeiro</div>
+
+  <div class="seg">
+    <button [class.on]="aba() === 'receb'" (click)="setAba('receb')">Recebimentos</button>
+    <button [class.on]="aba() === 'pagto'" (click)="setAba('pagto')">Pagos a ajudantes</button>
+    <button [class.on]="aba() === 'acerto'" (click)="setAba('acerto')">Acerto &amp; origens</button>
+  </div>
+
+  <!-- filtros de período (comuns às abas) -->
+  <div class="f-2" style="max-width:420px">
+    <div class="f"><label>De</label><input type="date" [(ngModel)]="de" name="de" (ngModelChange)="recarregar()" /></div>
+    <div class="f"><label>Até</label><input type="date" [(ngModel)]="ate" name="ate" (ngModelChange)="recarregar()" /></div>
+  </div>
+
+  <!-- ================= ABA RECEBIMENTOS ================= -->
+  @if (aba() === 'receb') {
+    <div class="row" style="margin-bottom:10px">
+      <select [(ngModel)]="tipoFiltro" name="tipoFiltro" (ngModelChange)="recarregar()"
+              style="border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:13px;background:#fff">
+        <option value="">Todos</option>
+        <option value="adiantamento">Adiantamentos</option>
+        <option value="fechamento">Fechamentos</option>
+      </select>
+      <button class="btn btn-p btn-s" (click)="abrirAdiantamento(null)">+ Adiantamento</button>
+    </div>
+
+    <div class="card">
+      @if (recebs().length === 0) {
+        <p class="muted">Nenhum recebimento no período.</p>
+      }
+      <div class="list">
+        @for (r of recebs(); track r.id) {
+          <div class="row">
+            <div>
+              <b>{{ r.tipo === 'adiantamento' ? 'Adiantamento' : 'Fechamento' }}</b>@if (r.maquina_nome) { — {{ r.maquina_nome }}}
+              <div class="tiny">{{ fmtData(r.data) }}@if (r.obs) { · {{ r.obs }}}</div>
+              @if (editavel(r)) {
+                <div style="display:flex;gap:10px;margin-top:3px">
+                  <button class="tiny" style="background:none;border:0;color:var(--slate)" (click)="abrirAdiantamento(r)">Editar</button>
+                  <button class="tiny" style="background:none;border:0;color:var(--pocket)" (click)="excluirRecebimento(r)">Excluir</button>
+                </div>
+              }
+            </div>
+            <div style="text-align:right">
+              <div class="val pos">{{ fmtMoney(r.valor) }}</div>
+              <span class="chip {{ r.status === 'aberto' ? 'c-warn' : 'c-in' }}">
+                {{ r.status === 'aberto' ? 'em aberto' : 'quitado' }}
+              </span>
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+    <div class="alert a-info" style="margin-top:12px">
+      <app-icon name="alert" />
+      <div>Adiantamentos <b>em aberto</b> são abatidos automaticamente quando você gera o fechamento do período.</div>
+    </div>
+  }
+
+  <!-- ================= ABA PAGOS A AJUDANTES ================= -->
+  @if (aba() === 'pagto') {
+    <div class="row" style="margin-bottom:10px">
+      <select [(ngModel)]="origemFiltro" name="origemFiltro" (ngModelChange)="recarregar()"
+              style="border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:13px;background:#fff">
+        <option value="">Todas as origens</option>
+        <option value="repasse">Repasse EPR</option>
+        <option value="epr_direto">EPR direto</option>
+        <option value="bolso">Do bolso</option>
+      </select>
+      <span></span>
+    </div>
+    <div class="card">
+      @if (pagamentos().length === 0) {
+        <p class="muted">Nenhum pagamento a ajudante no período.</p>
+      }
+      <div class="list">
+        @for (p of pagamentos(); track $index) {
+          <div class="row">
+            <div>
+              <b>{{ p.ajudante_nome }}</b> — {{ p.maquina_nome }}
+              <div class="tiny">{{ fmtData(p.data) }} · {{ fmtHoras(p.horas) }}h</div>
+            </div>
+            <div style="text-align:right">
+              <div class="val neg">− {{ fmtMoney(p.valor) }}</div>
+              <span class="chip {{ chip[p.origem][1] }}">{{ chip[p.origem][0] }}</span>
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  <!-- ================= ABA ACERTO & ORIGENS ================= -->
+  @if (aba() === 'acerto') {
+    @if (totais(); as t) {
+      <div class="grid g3">
+        <div class="card kpi"><div class="lb">EPR mandou p/ repasse</div>
+          <div class="v mono" style="font-size:20px">{{ fmtMoney(t.repasse_recebido) }}</div>
+          <div class="s">no período</div></div>
+        <div class="card kpi"><div class="lb">Você repassou</div>
+          <div class="v mono" style="font-size:20px">{{ fmtMoney(t.repasse_pago) }}</div>
+          <div class="s">no período</div></div>
+        <div class="card kpi"><div class="lb">Em caixa de repasse</div>
+          <div class="v mono" style="font-size:20px" [class.pos]="t.caixa_repasse >= 0" [class.neg]="t.caixa_repasse < 0">{{ fmtMoney(t.caixa_repasse) }}</div>
+          <div class="s">acumulado — não filtra por período</div></div>
+      </div>
+      <div class="grid g3" style="margin-top:10px">
+        <div class="card kpi"><div class="lb">Saiu do seu bolso</div>
+          <div class="v mono neg" style="font-size:20px">{{ fmtMoney(t.saido_bolso) }}</div>
+          <div class="s">a considerar no acerto</div></div>
+        <div class="card kpi"><div class="lb">Pago pela EPR direto</div>
+          <div class="v mono" style="font-size:20px">{{ fmtMoney(t.pago_epr_direto) }}</div>
+          <div class="s">não passa pela sua mão</div></div>
+        <div class="card kpi"><div class="lb">Custo total ajudantes</div>
+          <div class="v mono" style="font-size:20px">{{ fmtMoney(t.custo_total_ajudantes) }}</div>
+          <div class="s">no período</div></div>
+      </div>
+    }
+    <div class="alert a-warn" style="margin-top:12px">
+      <app-icon name="alert" />
+      <div>O sistema separa <b>quem pagou cada diária</b>: o que é repasse não é custo seu; o que saiu do bolso entra no seu acerto. É essa separação que evita confusão no fechamento.</div>
+    </div>
+
+    <div class="row" style="margin:16px 0 8px">
+      <div class="h-sec" style="margin:0">Verbas de repasse do período</div>
+      <button class="btn btn-p btn-s" (click)="abrirVerba(null)">+ Verba de repasse</button>
+    </div>
+    <div class="card">
+      @if (verbas().length === 0) {
+        <p class="muted">Nenhuma verba de repasse no período.</p>
+      }
+      <div class="list">
+        @for (v of verbas(); track v.id) {
+          <div class="row">
+            <div>
+              <b>Verba de repasse</b>
+              <div class="tiny">{{ fmtData(v.data) }}@if (v.obs) { · {{ v.obs }}}</div>
+              <div style="display:flex;gap:10px;margin-top:3px">
+                <button class="tiny" style="background:none;border:0;color:var(--slate)" (click)="abrirVerba(v)">Editar</button>
+                <button class="tiny" style="background:none;border:0;color:var(--pocket)" (click)="excluirVerba(v)">Excluir</button>
+              </div>
+            </div>
+            <div class="val pos">{{ fmtMoney(v.valor) }}</div>
+          </div>
+        }
+      </div>
+    </div>
+  }
+</section>
+
+<!-- ================= MODAL ADIANTAMENTO ================= -->
+@if (adAberto()) {
+  <app-modal (fechado)="adAberto.set(false)">
+    <h3>{{ adEdit ? 'Editar adiantamento' : 'Novo adiantamento' }}</h3>
+    <div class="muted">Dinheiro recebido antes do acerto — fica em aberto até o fechamento</div>
+    @if (adErro()) {
+      <div class="alert a-hot"><app-icon name="alert" /><div>{{ adErro() }}</div></div>
+    }
+    <div class="f-2">
+      <div class="f"><label>Data</label><input type="date" [(ngModel)]="adData" name="adData" /></div>
+      <div class="f"><label>Valor (R$)</label>
+        <input type="number" inputmode="decimal" min="0" [(ngModel)]="adValor" name="adValor" /></div>
+    </div>
+    <div class="f">
+      <label>Máquina (opcional)</label>
+      <select [(ngModel)]="adMaquinaId" name="adMaquinaId">
+        <option value="">Sem vínculo</option>
+        @for (m of maquinasAbertas(); track m.id) {
+          <option [value]="m.id">{{ m.nome }} — {{ m.cliente }}</option>
+        }
+      </select>
+    </div>
+    <div class="f"><label>Observações</label><textarea rows="2" [(ngModel)]="adObs" name="adObs"></textarea></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+      <button class="btn btn-o" (click)="adAberto.set(false)">Cancelar</button>
+      <button class="btn btn-p" (click)="salvarAdiantamento()">Salvar</button>
+    </div>
+  </app-modal>
+}
+
+<!-- ================= MODAL VERBA DE REPASSE ================= -->
+@if (vbAberto()) {
+  <app-modal (fechado)="vbAberto.set(false)">
+    <h3>{{ vbEdit ? 'Editar verba de repasse' : 'Nova verba de repasse' }}</h3>
+    <div class="muted">Dinheiro que a EPR mandou pra você repassar aos ajudantes</div>
+    @if (vbErro()) {
+      <div class="alert a-hot"><app-icon name="alert" /><div>{{ vbErro() }}</div></div>
+    }
+    <div class="f-2">
+      <div class="f"><label>Data</label><input type="date" [(ngModel)]="vbData" name="vbData" /></div>
+      <div class="f"><label>Valor (R$)</label>
+        <input type="number" inputmode="decimal" min="0" [(ngModel)]="vbValor" name="vbValor" /></div>
+    </div>
+    <div class="f"><label>Observações</label><textarea rows="2" [(ngModel)]="vbObs" name="vbObs"></textarea></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+      <button class="btn btn-o" (click)="vbAberto.set(false)">Cancelar</button>
+      <button class="btn btn-p" (click)="salvarVerba()">Salvar</button>
+    </div>
+  </app-modal>
+}

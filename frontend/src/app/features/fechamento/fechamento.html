@@ -1,0 +1,175 @@
+<section class="screen">
+  <div class="h-sec">Fechamento com a EPR</div>
+
+  @if (sucesso(); as f) {
+    <div class="alert a-info">
+      <app-icon name="fech" />
+      <div>
+        Acerto <b class="val">{{ f.numero }}</b> registrado! Máquinas fechadas e adiantamentos quitados.
+        <button class="btn btn-o btn-s" style="margin-left:8px" (click)="abrirPdfFechamento(f.id)">
+          <app-icon name="pdf" /> Abrir PDF do fechamento
+        </button>
+      </div>
+    </div>
+  }
+  @if (erro()) {
+    <div class="alert a-hot"><app-icon name="alert" /><div>{{ erro() }}</div></div>
+  }
+
+  <div class="card">
+    <div class="f-2">
+      <div class="f"><label>De</label><input type="date" [(ngModel)]="de" name="de" /></div>
+      <div class="f"><label>Até</label><input type="date" [(ngModel)]="ate" name="ate" /></div>
+    </div>
+    <button class="btn btn-g btn-s" (click)="calcular()" [disabled]="calculando()">
+      {{ calculando() ? 'Calculando…' : 'Calcular prévia' }}
+    </button>
+
+    @if (previa(); as p) {
+      <div class="muted" style="margin:14px 0 10px">
+        Entram no período: máquinas <b>finalizadas</b> e os <b>adiantamentos em aberto</b> vinculados.
+      </div>
+
+      @if (p.maquinas.length === 0) {
+        <p class="muted">Nenhuma máquina finalizada no período — nada a fechar.</p>
+      } @else {
+        <div class="list">
+          @for (m of p.maquinas; track m.id) {
+            <div class="row">
+              <div><b>{{ m.nome }}</b> — {{ m.cliente }}
+                <div class="tiny">finalizada em {{ fmtData(m.data_finalizacao) }} · empreita integral</div>
+              </div>
+              <span class="val pos">{{ fmtMoney(m.empreita) }}</span>
+            </div>
+          }
+          @for (a of p.adiantamentos; track a.id) {
+            <div class="row">
+              <div><b>Adiantamento {{ fmtData(a.data) }}</b> — {{ a.maquina_nome || 'sem vínculo' }}
+                <div class="tiny">abatido no fechamento</div>
+              </div>
+              <span class="val neg">− {{ fmtMoney(a.valor) }}</span>
+            </div>
+          }
+        </div>
+
+        <div class="regua">
+          <div class="lbls">
+            <span>Devido no período: <b class="val">{{ fmtMoney(p.total_devido) }}</b></span>
+            <span>Já adiantado: <b class="val">{{ fmtMoney(p.total_adiantado) }}</b></span>
+          </div>
+          <div class="track">
+            <div class="adv" [style.width.%]="advPct(p)"></div>
+            <div class="dev" [style.width.%]="100 - advPct(p)"></div>
+          </div>
+          <div class="legend">
+            <span><i style="background:var(--warn)"></i>Adiantado (abate)</span>
+            <span><i style="background:var(--in)"></i>Saldo a receber</span>
+          </div>
+        </div>
+
+        <div class="row" style="background:var(--iron);border-radius:11px;padding:13px 15px">
+          <b style="color:#fff" class="disp">{{ p.saldo > 0 ? 'SALDO A RECEBER' : 'SALDO' }}</b>
+          <span class="val" style="color:#fff;font-size:19px">{{ fmtMoney(p.saldo) }}</span>
+        </div>
+        @if (p.saldo <= 0) {
+          <div class="tiny" style="margin-top:6px">
+            O adiantado cobriu (ou superou) o valor devido — nenhum valor novo a receber neste acerto.
+          </div>
+        }
+
+        <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+          <button class="btn btn-o" (click)="abrirPdfPrevia()">
+            <app-icon name="pdf" /> Gerar PDF da prévia
+          </button>
+          <button class="btn btn-p" [disabled]="!p.pode_registrar" (click)="confirmAberto.set(true)">
+            Registrar acerto
+          </button>
+          @if (!p.pode_registrar) {
+            <span class="tiny" style="align-self:center">Nenhuma máquina finalizada no período.</span>
+          }
+        </div>
+      }
+    }
+  </div>
+
+  <div class="alert a-info" style="margin-top:12px">
+    <app-icon name="alert" />
+    <div>Sem data fixa, sem problema: os adiantamentos ficam <b>em aberto</b> até você gerar o fechamento — seja no fim do mês ou três meses depois. Nada se perde.</div>
+  </div>
+
+  <!-- ================= HISTÓRICO ================= -->
+  <div class="h-sec">Fechamentos registrados</div>
+  <div class="card">
+    @if (hist().length === 0) {
+      <p class="muted">Nenhum fechamento registrado ainda.</p>
+    }
+    <div class="list">
+      @for (f of hist(); track f.id) {
+        <div>
+          <div class="row">
+            <div>
+              <b class="val">{{ f.numero }}</b> · {{ fmtData(f.periodo_de) }} a {{ fmtData(f.periodo_ate) }}
+              <div class="tiny">{{ nomesMaquinas(f) }}</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span class="val pos">{{ fmtMoney(f.saldo) }}</span>
+              <button class="btn btn-o btn-s" (click)="abrirPdfFechamento(f.id)"><app-icon name="pdf" /> PDF</button>
+              <button class="btn btn-o btn-s" (click)="verDetalhe(f)">
+                {{ detalhe()?.id === f.id ? 'Fechar' : 'Detalhe' }}
+              </button>
+            </div>
+          </div>
+          @if (detalhe(); as d) {
+            @if (d.id === f.id) {
+              <div style="background:var(--surf2);border-radius:9px;padding:10px 12px;margin-top:8px">
+                <div class="tiny" style="font-weight:600;margin-bottom:4px">MÁQUINAS ({{ d.maquinas.length }})</div>
+                @for (m of d.maquinas; track m.id) {
+                  <div class="row"><span>{{ m.nome }} — {{ m.cliente }}</span><span class="val">{{ fmtMoney(m.empreita) }}</span></div>
+                }
+                <div class="tiny" style="font-weight:600;margin:8px 0 4px">ADIANTAMENTOS ABATIDOS ({{ d.adiantamentos.length }})</div>
+                @if (d.adiantamentos.length === 0) {
+                  <div class="tiny">Nenhum.</div>
+                }
+                @for (a of d.adiantamentos; track a.id) {
+                  <div class="row"><span>{{ fmtData(a.data) }} — {{ a.maquina_nome || 'sem vínculo' }}</span><span class="val neg">− {{ fmtMoney(a.valor) }}</span></div>
+                }
+                <div class="row" style="margin-top:8px">
+                  <span class="tiny" style="font-weight:600">devido {{ fmtMoney(d.total_devido) }} · adiantado {{ fmtMoney(d.total_adiantado) }}</span>
+                  <span class="val">saldo {{ fmtMoney(d.saldo) }}</span>
+                </div>
+                @if (d.obs) { <div class="tiny" style="margin-top:4px">Obs: {{ d.obs }}</div> }
+              </div>
+            }
+          }
+        </div>
+      }
+    </div>
+  </div>
+</section>
+
+<!-- ================= CONFIRMAÇÃO DO ACERTO ================= -->
+@if (confirmAberto()) {
+  <app-modal (fechado)="confirmAberto.set(false)">
+    <h3>Registrar o acerto?</h3>
+    @if (previa(); as p) {
+      <div class="muted">
+        {{ p.maquinas.length }} máquina(s) · {{ p.adiantamentos.length }} adiantamento(s) a abater ·
+        saldo {{ fmtMoney(p.saldo) }}
+      </div>
+      <div class="alert a-warn">
+        <app-icon name="alert" />
+        <div><b>Esta ação é definitiva:</b> máquinas serão fechadas e adiantamentos quitados. Não há como desfazer.</div>
+      </div>
+      <div class="f">
+        <label>Observações (opcional)</label>
+        <textarea rows="2" [(ngModel)]="obs" name="obs" placeholder="Ex.: acertado com o Elessandro em dinheiro"></textarea>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+        <button class="btn btn-o" (click)="confirmAberto.set(false)">Cancelar</button>
+        <button class="btn btn-p" (click)="registrar()" [disabled]="registrando()">
+          {{ registrando() ? 'Registrando…' : 'Confirmar acerto' }}
+        </button>
+      </div>
+    }
+  </app-modal>
+}
