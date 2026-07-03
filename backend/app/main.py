@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
-from app.routers import auth, config as config_router
+from app.routers import ajudantes, auth, config as config_router, maquinas
 from app.seed import run_seed
 
 
@@ -37,6 +37,8 @@ app.mount("/media", StaticFiles(directory=settings.MEDIA_DIR), name="media")
 
 app.include_router(auth.router)
 app.include_router(config_router.router)
+app.include_router(ajudantes.router)
+app.include_router(maquinas.router)
 
 
 @app.get("/health")

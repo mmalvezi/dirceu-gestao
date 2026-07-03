@@ -1,5 +1,7 @@
 """Schemas Pydantic da API (cresce a cada fase)."""
 
+from datetime import date
+
 from pydantic import BaseModel, ConfigDict
 
 
@@ -25,3 +27,72 @@ class ConfigOut(BaseModel):
 class ConfigUpdate(BaseModel):
     nome_exibicao: str | None = None
     telefone: str | None = None
+
+
+# ----- Ajudantes -----
+
+class AjudanteCreate(BaseModel):
+    nome: str
+    telefone: str | None = None
+    valor_hora_padrao: float | None = None
+    obs: str | None = None
+
+
+class AjudanteUpdate(BaseModel):
+    nome: str | None = None
+    telefone: str | None = None
+    valor_hora_padrao: float | None = None
+    obs: str | None = None
+    ativo: bool | None = None
+
+
+class AjudanteOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    nome: str
+    telefone: str | None
+    valor_hora_padrao: float | None
+    obs: str | None
+    ativo: bool
+
+
+# ----- Máquinas -----
+
+class MaquinaCreate(BaseModel):
+    nome: str
+    cliente: str
+    empreita: float
+    data_inicio: date
+    obs: str | None = None
+
+
+class MaquinaUpdate(BaseModel):
+    nome: str | None = None
+    cliente: str | None = None
+    empreita: float | None = None
+    status: str | None = None
+    data_inicio: date | None = None
+    data_finalizacao: date | None = None
+    obs: str | None = None
+
+
+class UltimoLancamento(BaseModel):
+    data: date
+    descricao: str
+
+
+class MaquinaOut(BaseModel):
+    id: int
+    nome: str
+    cliente: str
+    empreita: float
+    status: str
+    data_inicio: date
+    data_finalizacao: date | None = None
+    obs: str | None = None
+    custo: float
+    horas: float
+    margem: float
+    pct_consumido: int
+    ultimo_lancamento: UltimoLancamento | None = None
