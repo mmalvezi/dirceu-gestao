@@ -1,14 +1,24 @@
-"""Aplicação FastAPI — Dirceu Caldeiraria & Solda (Fase 1: fundação)."""
+"""Aplicação FastAPI — Dirceu Caldeiraria & Solda."""
 
 import os
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
+from app.seed import run_seed
 
-app = FastAPI(title="Dirceu — Caldeiraria & Solda")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Seed idempotente no startup (requer que as tabelas já existam — alembic upgrade head).
+    run_seed()
+    yield
+
+
+app = FastAPI(title="Dirceu — Caldeiraria & Solda", lifespan=lifespan)
 
 # CORS a partir das origens configuradas.
 app.add_middleware(
