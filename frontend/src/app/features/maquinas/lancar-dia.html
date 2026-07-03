@@ -1,0 +1,78 @@
+<app-modal (fechado)="fechado.emit()">
+  <h3>{{ entrada() ? 'Editar dia de trabalho' : 'Lançar dia de trabalho' }}</h3>
+  <div class="muted">{{ maquinaNome() }}{{ maquinaCliente() ? ' — ' + maquinaCliente() : '' }}</div>
+
+  @if (erro()) {
+    <div class="alert a-hot"><app-icon name="alert" /><div>{{ erro() }}</div></div>
+  }
+
+  <div class="f">
+    <label>Data</label>
+    <input type="date" name="data" [(ngModel)]="data" />
+  </div>
+  <div class="f">
+    <label>O que foi feito</label>
+    <textarea rows="2" name="descricao" [(ngModel)]="descricao"
+              placeholder="Ex.: solda das cantoneiras internas e troca dos bicos"></textarea>
+  </div>
+
+  <div class="f">
+    <label>Quem trabalhou</label>
+    @for (l of linhas(); track $index; let i = $index) {
+      <div class="worker" style="align-items:stretch">
+        <div style="flex:1;min-width:190px">
+          <select [(ngModel)]="l.sel" [attr.name]="'sel' + i"
+                  (ngModelChange)="sugerirValor(l)"
+                  style="width:100%;border:1px solid var(--line);border-radius:8px;padding:7px 8px;font-size:13px;background:#fff">
+            <option value="" disabled>Ajudante…</option>
+            @for (a of ajudantes(); track a.id) {
+              <option [value]="a.id">{{ a.nome }}</option>
+            }
+            <option value="outro">Outro (digitar nome)</option>
+          </select>
+          @if (l.sel === 'outro') {
+            <input [(ngModel)]="l.nome" [attr.name]="'nome' + i" placeholder="Nome do ajudante"
+                   style="width:100%;margin-top:6px;border:1px solid var(--line);border-radius:8px;padding:7px 8px;font-size:13px" />
+          }
+          <div class="hs" style="margin-top:6px;display:flex;align-items:center;gap:4px">
+            <input type="number" inputmode="decimal" min="0" step="0.5"
+                   [(ngModel)]="l.horas" [attr.name]="'horas' + i" (ngModelChange)="sugerirValor(l)"
+                   style="width:64px;border:1px solid var(--line);border-radius:6px;padding:5px 6px" />
+            h &nbsp;·&nbsp; R$
+            <input type="number" inputmode="decimal" min="0" step="10"
+                   [(ngModel)]="l.valor" [attr.name]="'valor' + i" (ngModelChange)="valorDigitado(l)"
+                   style="width:84px;border:1px solid var(--line);border-radius:6px;padding:5px 6px" />
+          </div>
+        </div>
+        <div class="right" style="flex-direction:column;align-items:flex-end;justify-content:space-between">
+          <button type="button" (click)="removeLinha(i)" [disabled]="linhas().length === 1"
+                  aria-label="Remover linha"
+                  style="background:none;border:0;color:var(--slate-2);font-size:16px;line-height:1;padding:2px 4px">✕</button>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px">
+            <select [(ngModel)]="l.origem" [attr.name]="'origem' + i"
+                    style="border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-size:12px;background:#fff">
+              @for (o of ORIGENS; track o[0]) {
+                <option [value]="o[0]">{{ o[1] }}</option>
+              }
+            </select>
+            @for (o of ORIGENS; track o[0]) {
+              @if (l.origem === o[0]) {
+                <span class="chip {{ o[2] }}">{{ o[1] }}</span>
+              }
+            }
+          </div>
+        </div>
+      </div>
+    }
+    <button type="button" class="btn btn-o btn-s" style="margin-top:8px" (click)="addLinha()">
+      + ajudante
+    </button>
+  </div>
+
+  <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+    <button type="button" class="btn btn-o" (click)="fechado.emit()">Cancelar</button>
+    <button type="button" class="btn btn-p" (click)="salvar()" [disabled]="salvando()">
+      {{ salvando() ? 'Salvando…' : 'Salvar dia' }}
+    </button>
+  </div>
+</app-modal>

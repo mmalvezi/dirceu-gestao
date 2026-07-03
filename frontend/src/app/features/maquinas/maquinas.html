@@ -1,0 +1,90 @@
+<section class="screen">
+  <div class="row" style="margin-bottom:12px">
+    <div class="h-sec" style="margin:0">Máquinas · empreitas</div>
+    <button class="btn btn-p btn-s" (click)="formAberto.set(true)">+ Nova máquina</button>
+  </div>
+
+  <div class="seg">
+    @for (f of FILTROS; track f[0]) {
+      <button [class.on]="filtro() === f[0]" (click)="setFiltro(f[0])">{{ f[1] }}</button>
+    }
+  </div>
+
+  <div class="f" style="margin-bottom:14px">
+    <input [(ngModel)]="q" name="q" (ngModelChange)="buscou()"
+           placeholder="Buscar por nome ou cliente…" />
+  </div>
+
+  @if (carregou() && maquinas().length === 0) {
+    <div class="card" style="text-align:center;padding:28px">
+      <p style="font-weight:600;margin-bottom:4px">
+        {{ filtro() || q ? 'Nenhuma máquina encontrada.' : 'Nenhuma máquina ainda.' }}
+      </p>
+      <p class="muted">
+        {{ filtro() || q
+            ? 'Tente outro filtro ou busca.'
+            : 'Cadastre a primeira máquina pra começar a lançar o diário de obra.' }}
+      </p>
+      @if (!filtro() && !q) {
+        <button class="btn btn-p" style="margin-top:14px" (click)="formAberto.set(true)">
+          + Nova máquina
+        </button>
+      }
+    </div>
+  }
+
+  <div class="grid g2">
+    @for (m of maquinas(); track m.id) {
+      <div class="card mq" (click)="abrir(m)">
+        <div class="top">
+          <div><h3>{{ m.nome }}</h3><div class="cli">{{ m.cliente }}</div></div>
+          <span class="badge {{ badge[m.status][1] }}">{{ badge[m.status][0] }}</span>
+        </div>
+        <div class="bar">
+          <i class="{{ barCls(m.pct_consumido) }}"
+             [style.width.%]="m.pct_consumido > 100 ? 100 : m.pct_consumido"></i>
+        </div>
+        <div class="nums">
+          <div><b>Empreita</b><span>{{ fmtMoney(m.empreita) }}</span></div>
+          <div><b>Custo até agora</b><span>{{ fmtMoney(m.custo) }}</span></div>
+          <div><b>Margem</b><span [class.pos]="m.margem >= 0" [class.neg]="m.margem < 0">{{ fmtMoney(m.margem) }}</span></div>
+          <div><b>Horas</b><span>{{ fmtHoras(m.horas) }}h</span></div>
+        </div>
+        <div class="tiny">
+          @if (m.ultimo_lancamento) {
+            Último lançamento: {{ fmtDataCurta(m.ultimo_lancamento.data) }} — {{ truncar(m.ultimo_lancamento.descricao) }}
+          } @else {
+            Sem lançamentos ainda
+          }
+        </div>
+      </div>
+    }
+  </div>
+</section>
+
+@if (formAberto()) {
+  <app-maquina-form (salvo)="aoSalvarMaquina()" (fechado)="formAberto.set(false)" />
+}
+
+@if (pickerAberto()) {
+  <app-modal (fechado)="pickerAberto.set(false)">
+    <h3>Lançar dia em qual máquina?</h3>
+    <div class="muted">Só máquinas ainda não fechadas</div>
+    <div class="list">
+      @for (m of lancavel(); track m.id) {
+        <div class="row" style="cursor:pointer" (click)="escolherParaLancar(m)">
+          <div><b>{{ m.nome }}</b><div class="tiny">{{ m.cliente }}</div></div>
+          <span class="badge {{ badge[m.status][1] }}">{{ badge[m.status][0] }}</span>
+        </div>
+      }
+    </div>
+    <div style="display:flex;justify-content:flex-end;margin-top:12px">
+      <button class="btn btn-o" (click)="pickerAberto.set(false)">Cancelar</button>
+    </div>
+  </app-modal>
+}
+
+@if (lancarEm(); as m) {
+  <app-lancar-dia [maquinaId]="m.id" [maquinaNome]="m.nome" [maquinaCliente]="m.cliente"
+                  (salvo)="aoLancar()" (fechado)="lancarEm.set(null)" />
+}

@@ -22,6 +22,11 @@ export const routes: Routes = [
         loadComponent: () => import('./features/maquinas/maquinas').then((m) => m.MaquinasPage),
       },
       {
+        path: 'maquinas/:id',
+        loadComponent: () =>
+          import('./features/maquinas/maquina-detalhe').then((m) => m.MaquinaDetalhePage),
+      },
+      {
         path: 'financeiro',
         loadComponent: () => import('./features/financeiro/financeiro').then((m) => m.FinanceiroPage),
       },

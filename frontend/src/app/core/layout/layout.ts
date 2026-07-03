@@ -4,6 +4,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { filter } from 'rxjs';
 
 import { AuthService } from '../auth.service';
+import { FabService } from '../fab.service';
 import { Icon, IconName } from '../icon';
 
 interface NavItem {
@@ -22,6 +23,7 @@ interface NavItem {
 export class Layout {
   private auth = inject(AuthService);
   private router = inject(Router);
+  private fab = inject(FabService);
 
   nav: NavItem[] = [
     { path: '/', label: 'Início', icon: 'home', exact: true },
@@ -49,8 +51,7 @@ export class Layout {
   }
 
   lancarDia(): void {
-    // Placeholder — a Fase 12a liga o FAB no modal "Lançar dia".
-    console.log('[FAB] Lançar dia — implementado na Fase 12a');
+    this.fab.cliques.next();
   }
 
   sair(): void {

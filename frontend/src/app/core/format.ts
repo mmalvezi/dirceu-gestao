@@ -38,6 +38,15 @@ export function formatDateShort(iso: string | null | undefined): string {
   return `${d}/${m}`;
 }
 
+/** 'YYYY-MM-DD' -> 'qua, 01/07' (dia da semana via Date LOCAL — sem parse de string). */
+export function formatDateDia(iso: string | null | undefined): string {
+  if (!iso) return '';
+  const [a, m, d] = iso.split('-').map(Number);
+  const dias = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+  const wd = dias[new Date(a, m - 1, d).getDay()];
+  return `${wd}, ${String(d).padStart(2, '0')}/${String(m).padStart(2, '0')}`;
+}
+
 /** Data de hoje como 'YYYY-MM-DD' (para inputs type=date). */
 export function todayIso(): string {
   const d = new Date();

@@ -1,0 +1,98 @@
+<section class="screen">
+  <a class="back" routerLink="/maquinas">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="16" height="16"><path d="M15 5l-7 7 7 7"/></svg>
+    Máquinas
+  </a>
+
+  @if (aviso()) {
+    <div class="alert a-warn"><app-icon name="alert" /><div>{{ aviso() }}</div></div>
+  }
+
+  @if (m(); as mq) {
+    <div class="card">
+      <div class="top row" style="align-items:flex-start">
+        <div>
+          <h3 class="disp" style="font-size:20px">{{ mq.nome }}</h3>
+          <div class="cli muted">{{ mq.cliente }}</div>
+        </div>
+        <span class="badge {{ badge[mq.status][1] }}">{{ badge[mq.status][0] }}</span>
+      </div>
+      <div class="grid g4" style="margin-top:12px">
+        <div><b class="tiny">EMPREITA</b><div class="val" style="font-size:17px">{{ fmtMoney(mq.empreita) }}</div></div>
+        <div><b class="tiny">CUSTO ATÉ AGORA</b><div class="val" style="font-size:17px">{{ fmtMoney(mq.custo) }}</div></div>
+        <div><b class="tiny">MARGEM HOJE</b><div class="val" style="font-size:17px" [class.pos]="mq.margem >= 0" [class.neg]="mq.margem < 0">{{ fmtMoney(mq.margem) }}</div></div>
+        <div><b class="tiny">HORAS</b><div class="val" style="font-size:17px">{{ fmtHoras(mq.horas) }}h</div></div>
+      </div>
+      <div class="bar" style="margin-top:12px">
+        <i class="{{ barCls(mq.pct_consumido) }}"
+           [style.width.%]="mq.pct_consumido > 100 ? 100 : mq.pct_consumido"></i>
+      </div>
+      <div class="tiny" style="margin-top:5px">{{ mq.pct_consumido }}% da empreita consumida em custos</div>
+
+      <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+        @if (mq.status !== 'fechada') {
+          <button class="btn btn-p btn-s" (click)="lancarAberto.set(true)">+ Lançar dia</button>
+        }
+        <button class="btn btn-o btn-s" (click)="abrirPdf()">
+          <app-icon name="pdf" /> PDF da máquina
+        </button>
+        @if (mq.status === 'andamento') {
+          <button class="btn btn-o btn-s" (click)="editarMaquina.set(true)">Editar</button>
+          <button class="btn btn-o btn-s" (click)="finalizar()">Finalizar máquina</button>
+        }
+        @if (mq.status === 'finalizada') {
+          <button class="btn btn-o btn-s" (click)="editarMaquina.set(true)">Editar</button>
+          <button class="btn btn-o btn-s" (click)="reabrir()">Reabrir</button>
+        }
+      </div>
+    </div>
+
+    <div class="h-sec">Diário de obra</div>
+    @if (mq.diario.length === 0) {
+      <div class="card"><p class="muted">Nenhum dia lançado ainda — use o "+ Lançar dia".</p></div>
+    }
+    @for (e of mq.diario; track e.id) {
+      <div class="day">
+        <div class="row">
+          <div class="dt">{{ fmtDia(e.data) }}</div>
+          @if (mq.status !== 'fechada') {
+            <div style="display:flex;gap:10px">
+              <button class="tiny" style="background:none;border:0;color:var(--slate)" (click)="editarEntrada.set(e)">Editar</button>
+              <button class="tiny" style="background:none;border:0;color:var(--pocket)" (click)="excluirEntrada(e)">Excluir</button>
+            </div>
+          }
+        </div>
+        <div class="desc">{{ e.descricao }}</div>
+        @for (t of e.trabalhos; track t.id) {
+          <div class="worker">
+            <div><span class="nm">{{ t.ajudante_nome }}</span> <span class="hs">· {{ fmtHoras(t.horas) }}h</span></div>
+            <div class="right">
+              <span class="chip {{ chip[t.origem][1] }}">{{ chip[t.origem][0] }}</span>
+              <span class="val">{{ fmtMoney(t.valor) }}</span>
+            </div>
+          </div>
+        }
+        <div class="tiny" style="margin-top:6px">
+          Total do dia: {{ fmtHoras(e.total_horas) }}h · {{ fmtMoney(e.total_valor) }}
+        </div>
+      </div>
+    }
+  }
+</section>
+
+@if (m(); as mq) {
+  @if (lancarAberto()) {
+    <app-lancar-dia [maquinaId]="mq.id" [maquinaNome]="mq.nome" [maquinaCliente]="mq.cliente"
+                    (salvo)="aoSalvarDia($event)" (fechado)="lancarAberto.set(false)" />
+  }
+  @if (editarEntrada(); as entrada) {
+    <app-lancar-dia [maquinaId]="mq.id" [maquinaNome]="mq.nome" [maquinaCliente]="mq.cliente"
+                    [entrada]="entrada"
+                    (salvo)="aoSalvarDia($event)" (fechado)="editarEntrada.set(null)" />
+  }
+  @if (editarMaquina()) {
+    <app-maquina-form [maquina]="mq"
+                      (salvo)="editarMaquina.set(false); carregar()"
+                      (fechado)="editarMaquina.set(false)" />
+  }
+}
