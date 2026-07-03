@@ -13,3 +13,15 @@ class UserOut(BaseModel):
 
     id: int
     username: str
+
+
+class ConfigOut(BaseModel):
+    nome_exibicao: str
+    telefone: str | None = None
+    logo_filename: str | None = None
+    logo_url: str | None = None
+
+
+class ConfigUpdate(BaseModel):
+    nome_exibicao: str | None = None
+    telefone: str | None = None
