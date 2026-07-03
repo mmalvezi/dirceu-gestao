@@ -10,8 +10,10 @@ from sqlalchemy.orm import Session
 from app.calc import agregados_por_maquina, calcular_margem_pct, ultimos_por_maquina
 from app.database import get_db
 from app.models import DiarioEntrada, Maquina, Recebimento
+from app.routers.diario import listar_diario
 from app.schemas import (
     MaquinaCreate,
+    MaquinaDetalheOut,
     MaquinaOut,
     MaquinaUpdate,
     UltimoLancamento,
@@ -87,13 +89,15 @@ def listar(
     ]
 
 
-@router.get("/{maquina_id}", response_model=MaquinaOut)
-def detalhe(maquina_id: int, db: Session = Depends(get_db)) -> MaquinaOut:
+@router.get("/{maquina_id}", response_model=MaquinaDetalheOut)
+def detalhe(maquina_id: int, db: Session = Depends(get_db)) -> MaquinaDetalheOut:
     maquina = _get_or_404(db, maquina_id)
     agregados = agregados_por_maquina(db, [maquina.id])
     ultimos = ultimos_por_maquina(db, [maquina.id])
     custo, horas = agregados.get(maquina.id, (Decimal("0"), Decimal("0")))
-    return _montar_out(maquina, custo, horas, ultimos.get(maquina.id))
+    base = _montar_out(maquina, custo, horas, ultimos.get(maquina.id))
+    diario = listar_diario(db, maquina.id)
+    return MaquinaDetalheOut(**base.model_dump(), diario=diario)
 
 
 @router.post("", response_model=MaquinaOut, status_code=status.HTTP_201_CREATED)

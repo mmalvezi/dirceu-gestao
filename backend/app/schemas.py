@@ -2,7 +2,7 @@
 
 from datetime import date
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class Token(BaseModel):
@@ -96,3 +96,48 @@ class MaquinaOut(BaseModel):
     margem: float
     pct_consumido: int
     ultimo_lancamento: UltimoLancamento | None = None
+
+
+# ----- Diário de obra -----
+
+class TrabalhoIn(BaseModel):
+    ajudante_id: int | None = None
+    ajudante_nome: str | None = None
+    horas: float = Field(gt=0)
+    valor: float = Field(ge=0)
+    origem: str
+
+
+class TrabalhoOut(BaseModel):
+    id: int
+    ajudante_id: int | None
+    ajudante_nome: str
+    horas: float
+    valor: float
+    origem: str
+
+
+class DiarioEntradaIn(BaseModel):
+    data: date
+    descricao: str
+    trabalhos: list[TrabalhoIn] = []
+
+
+class DiarioEntradaOut(BaseModel):
+    id: int
+    maquina_id: int
+    data: date
+    descricao: str
+    trabalhos: list[TrabalhoOut]
+    total_horas: float
+    total_valor: float
+
+
+class DiarioEntradaSalvaOut(DiarioEntradaOut):
+    """Resposta de POST/PUT: inclui o aviso de máquina finalizada (senão null)."""
+
+    aviso: str | None = None
+
+
+class MaquinaDetalheOut(MaquinaOut):
+    diario: list[DiarioEntradaOut] = []
