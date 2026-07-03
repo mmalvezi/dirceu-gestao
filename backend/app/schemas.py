@@ -1,6 +1,6 @@
 """Schemas Pydantic da API (cresce a cada fase)."""
 
-from datetime import date
+from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -209,3 +209,60 @@ class FinanceiroTotais(BaseModel):
     pago_epr_direto: float        # Σ trabalhos origem "epr_direto" no período
     custo_total_ajudantes: float  # soma das três origens no período
     adiantado_aberto: float       # Σ adiantamentos "aberto" (TOTAL, posição atual)
+
+
+# ----- Fechamento -----
+
+class FechamentoMaquina(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    nome: str
+    cliente: str
+    empreita: float
+    data_finalizacao: date | None
+
+
+class FechamentoAdiantamento(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    data: date
+    valor: float
+    maquina_id: int | None
+    maquina_nome: str | None
+
+
+class FechamentoPrevia(BaseModel):
+    periodo_de: date
+    periodo_ate: date
+    maquinas: list[FechamentoMaquina]
+    adiantamentos: list[FechamentoAdiantamento]
+    total_devido: float
+    total_adiantado: float
+    saldo: float
+    pode_registrar: bool
+
+
+class FechamentoCreate(BaseModel):
+    periodo_de: date
+    periodo_ate: date
+    obs: str | None = None
+
+
+class FechamentoOut(BaseModel):
+    id: int
+    numero: str
+    data_geracao: datetime
+    periodo_de: date
+    periodo_ate: date
+    total_devido: float
+    total_adiantado: float
+    saldo: float
+    obs: str | None
+    maquinas: list[FechamentoMaquina]
+
+
+class FechamentoDetalheOut(FechamentoOut):
+    adiantamentos: list[FechamentoAdiantamento]
+    recebimento_fechamento: RecebimentoOut | None = None

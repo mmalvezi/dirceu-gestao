@@ -163,6 +163,11 @@ def atualizar(
 @router.delete("/{maquina_id}", status_code=status.HTTP_204_NO_CONTENT)
 def excluir(maquina_id: int, db: Session = Depends(get_db)) -> None:
     maquina = _get_or_404(db, maquina_id)
+    if maquina.status == "fechada":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Máquina fechada não pode ser alterada.",
+        )
     tem_diario = (
         db.query(DiarioEntrada.id)
         .filter(DiarioEntrada.maquina_id == maquina_id)

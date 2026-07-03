@@ -13,6 +13,7 @@ from app.routers import (
     auth,
     config as config_router,
     diario,
+    fechamentos,
     financeiro,
     maquinas,
     recebimentos,
@@ -52,6 +53,7 @@ app.include_router(diario.router)
 app.include_router(recebimentos.router)
 app.include_router(repasses.router)
 app.include_router(financeiro.router)
+app.include_router(fechamentos.router)
 
 
 @app.get("/health")
