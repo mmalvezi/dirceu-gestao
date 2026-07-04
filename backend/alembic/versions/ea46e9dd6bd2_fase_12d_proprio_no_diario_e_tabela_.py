@@ -35,7 +35,8 @@ def upgrade() -> None:
         batch_op.create_index(batch_op.f('ix_despesas_data'), ['data'], unique=False)
 
     with op.batch_alter_table('diario_trabalhos', schema=None) as batch_op:
-        batch_op.add_column(sa.Column('proprio', sa.Boolean(), server_default=sa.text('0'), nullable=False))
+        # server_default portável: sa.false() -> 'false' no Postgres, '0' no SQLite
+        batch_op.add_column(sa.Column('proprio', sa.Boolean(), server_default=sa.false(), nullable=False))
 
     # ### end Alembic commands ###
 
