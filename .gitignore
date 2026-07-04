@@ -1,5 +1,6 @@
 # Backend
 backend/.env
+.env
 backend/media/
 .venv/
 __pycache__/

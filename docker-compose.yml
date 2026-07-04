@@ -1,0 +1,47 @@
+# Stack do Dirceu — segundo sistema no VPS.
+# NENHUMA porta publicada no host: o Caddy existente (stack do Everton) roteia
+# dirceufernandes.com.br -> dirceu-web:80 pela rede externa "caddy_net".
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  api:
+    build: ./backend
+    env_file: .env
+    volumes:
+      - media_data:/app/media
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  web:
+    build: ./frontend
+    container_name: dirceu-web # nome FIXO — o Caddyfile referencia por ele
+    depends_on:
+      - api
+    networks:
+      - default # fala com a api
+      - caddy_net # visível pro Caddy do outro stack
+    restart: unless-stopped
+
+networks:
+  default: {}
+  caddy_net:
+    external: true
+
+volumes:
+  db_data:
+  media_data:

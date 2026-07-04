@@ -1,0 +1,2 @@
+# Shell scripts SEMPRE com LF (o entrypoint quebra no Linux com CRLF)
+*.sh text eol=lf
