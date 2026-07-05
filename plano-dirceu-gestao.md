@@ -73,6 +73,7 @@ Sistema de gestão para o **Dirceu**, prestador PJ de caldeiraria e solda que ge
 **ajudantes** — id, nome, telefone (opc), valor_hora_padrao (num, opc — pré-preenche o lançamento), obs (opc), ativo (bool, default true)
 
 **maquinas** — id, nome, cliente (TEXTO livre — sem cadastro de cliente, simplicidade), empreita (num), status (`andamento`/`finalizada`/`fechada`), data_inicio (date), data_finalizacao (date, null), obs (opc), fechamento_id (FK null → fechamentos, SET NULL)
+  - **Exclusão:** máquina NÃO fechada pode ser excluída mesmo com lançamentos (com confirmação). O diário some (CASCADE); recebimentos e despesas vinculados são DESVINCULADOS (maquina_id→NULL, mantém maquina_nome — dinheiro/custo reais não somem). Máquina `fechada` (ou com recebimento `quitado`) → bloqueada: faz parte de um acerto registrado.
 
 **diario_entradas** — id, maquina_id (FK CASCADE), data (date), descricao (texto)
 

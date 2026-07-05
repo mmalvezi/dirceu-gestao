@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { ApiService } from '../api.service';
-import { DiarioEntrada, Maquina, MaquinaDetalhe } from '../models';
+import { DiarioEntrada, ExclusaoMaquina, Maquina, MaquinaDetalhe } from '../models';
 
 export interface MaquinaPayload {
   nome?: string;
@@ -49,8 +49,8 @@ export class MaquinaService {
     return this.api.put<Maquina>(`/maquinas/${id}`, dados);
   }
 
-  excluir(id: number): Observable<void> {
-    return this.api.delete<void>(`/maquinas/${id}`);
+  excluir(id: number): Observable<ExclusaoMaquina> {
+    return this.api.delete<ExclusaoMaquina>(`/maquinas/${id}`);
   }
 
   // ---- diário ----

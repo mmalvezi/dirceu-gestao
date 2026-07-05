@@ -81,6 +81,13 @@ export interface MaquinaDetalhe extends Maquina {
   diario: DiarioEntrada[];
 }
 
+export interface ExclusaoMaquina {
+  excluida: boolean;
+  diario_removido: number;
+  recebimentos_desvinculados: number;
+  despesas_desvinculadas: number;
+}
+
 export interface Recebimento {
   id: number;
   tipo: RecebimentoTipo;

@@ -8,6 +8,7 @@ import { ORIGEM_CHIP, STATUS_BADGE, barClass } from '../../core/labels';
 import { DiarioEntrada, MaquinaDetalhe } from '../../core/models';
 import { MaquinaService } from '../../core/services/maquina.service';
 import { formatDateDia, formatHours, formatMoney } from '../../core/format';
+import { Modal } from '../../shared/modal';
 import { Voltar } from '../../shared/voltar';
 import { LancarDia } from './lancar-dia';
 import { MaquinaForm } from './maquina-form';
@@ -15,7 +16,7 @@ import { MaquinaForm } from './maquina-form';
 /** Detalhe da máquina com diário de obra (scrMaquina do protótipo). */
 @Component({
   selector: 'app-maquina-detalhe',
-  imports: [Icon, LancarDia, MaquinaForm, Voltar],
+  imports: [Icon, LancarDia, MaquinaForm, Modal, Voltar],
   templateUrl: './maquina-detalhe.html',
 })
 export class MaquinaDetalhePage implements OnInit {
@@ -37,6 +38,8 @@ export class MaquinaDetalhePage implements OnInit {
   lancarAberto = signal(false);
   editarEntrada = signal<DiarioEntrada | null>(null);
   editarMaquina = signal(false);
+  excluirAberto = signal(false);
+  excluindo = signal(false);
   private avisoTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
@@ -88,6 +91,18 @@ export class MaquinaDetalhePage implements OnInit {
     this.svc.pdf(this.id).subscribe((blob) => {
       const url = URL.createObjectURL(blob);
       window.open(url, '_blank');
+    });
+  }
+
+  confirmarExclusao(): void {
+    if (this.excluindo()) return;
+    this.excluindo.set(true);
+    this.svc.excluir(this.id).subscribe({
+      next: () => this.router.navigate(['/maquinas']),
+      error: () => {
+        this.excluindo.set(false);
+        this.excluirAberto.set(false);
+      },
     });
   }
 }

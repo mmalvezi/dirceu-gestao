@@ -149,6 +149,13 @@ class MaquinaDetalheOut(MaquinaOut):
     diario: list[DiarioEntradaOut] = []
 
 
+class ExclusaoMaquinaOut(BaseModel):
+    excluida: bool
+    diario_removido: int
+    recebimentos_desvinculados: int
+    despesas_desvinculadas: int
+
+
 # ----- Financeiro: recebimentos -----
 
 class RecebimentoCreate(BaseModel):

@@ -9,9 +9,10 @@ from sqlalchemy.orm import Session
 
 from app.calc import Agregados, agregados_por_maquina, calcular_margem_pct, ultimos_por_maquina
 from app.database import get_db
-from app.models import DiarioEntrada, Maquina, Recebimento
+from app.models import Despesa, DiarioEntrada, Maquina, Recebimento
 from app.routers.diario import listar_diario
 from app.schemas import (
+    ExclusaoMaquinaOut,
     MaquinaCreate,
     MaquinaDetalheOut,
     MaquinaOut,
@@ -159,30 +160,55 @@ def atualizar(
     return _montar_out(maquina, agregados.get(maquina.id, Agregados()), ultimos.get(maquina.id))
 
 
-@router.delete("/{maquina_id}", status_code=status.HTTP_204_NO_CONTENT)
-def excluir(maquina_id: int, db: Session = Depends(get_db)) -> None:
+@router.delete("/{maquina_id}", response_model=ExclusaoMaquinaOut)
+def excluir(maquina_id: int, db: Session = Depends(get_db)) -> ExclusaoMaquinaOut:
+    """Exclui máquina NÃO fechada (mesmo com lançamentos), numa transação:
+
+    - diário (entradas + trabalhos) some junto (FK ondelete CASCADE);
+    - recebimentos vinculados são DESVINCULADOS (maquina_id=NULL, mantém o nome) —
+      é dinheiro real recebido, não some;
+    - despesas vinculadas idem (custo real do Dirceu).
+    Máquina fechada continua protegida (faz parte de um acerto registrado).
+    """
     maquina = _get_or_404(db, maquina_id)
     if maquina.status == "fechada":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Máquina fechada não pode ser alterada.",
+            detail="Máquina fechada não pode ser excluída (faz parte de um fechamento).",
         )
-    tem_diario = (
-        db.query(DiarioEntrada.id)
-        .filter(DiarioEntrada.maquina_id == maquina_id)
-        .first()
-        is not None
-    )
-    tem_recebimentos = (
+
+    # Defensivo: recebimento quitado vinculado pertence a um fechamento.
+    tem_quitado = (
         db.query(Recebimento.id)
-        .filter(Recebimento.maquina_id == maquina_id)
+        .filter(Recebimento.maquina_id == maquina_id, Recebimento.status == "quitado")
         .first()
         is not None
     )
-    if tem_diario or tem_recebimentos:
+    if tem_quitado:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Máquina possui lançamentos; não pode ser excluída.",
+            detail="Máquina tem recebimento já quitado (em um fechamento); não pode ser excluída.",
         )
-    db.delete(maquina)
+
+    diario_removido = (
+        db.query(DiarioEntrada.id).filter(DiarioEntrada.maquina_id == maquina_id).count()
+    )
+    recebimentos_desvinculados = (
+        db.query(Recebimento)
+        .filter(Recebimento.maquina_id == maquina_id)
+        .update({Recebimento.maquina_id: None}, synchronize_session=False)
+    )
+    despesas_desvinculadas = (
+        db.query(Despesa)
+        .filter(Despesa.maquina_id == maquina_id)
+        .update({Despesa.maquina_id: None}, synchronize_session=False)
+    )
+    db.delete(maquina)  # CASCADE remove o diário (entradas + trabalhos)
     db.commit()
+
+    return ExclusaoMaquinaOut(
+        excluida=True,
+        diario_removido=diario_removido,
+        recebimentos_desvinculados=recebimentos_desvinculados,
+        despesas_desvinculadas=despesas_desvinculadas,
+    )

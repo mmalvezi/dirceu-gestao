@@ -49,6 +49,13 @@
           <button class="btn btn-o btn-s" (click)="editarMaquina.set(true)">Editar</button>
           <button class="btn btn-o btn-s" (click)="reabrir()">Reabrir</button>
         }
+        @if (mq.status !== 'fechada') {
+          <button class="btn btn-o btn-s" style="color:var(--pocket)" (click)="excluirAberto.set(true)">
+            Excluir máquina
+          </button>
+        } @else {
+          <span class="tiny" style="align-self:center">Máquinas fechadas não podem ser excluídas.</span>
+        }
       </div>
     </div>
 
@@ -101,5 +108,30 @@
     <app-maquina-form [maquina]="mq"
                       (salvo)="editarMaquina.set(false); carregar()"
                       (fechado)="editarMaquina.set(false)" />
+  }
+  @if (excluirAberto()) {
+    <app-modal (fechado)="excluirAberto.set(false)">
+      <h3>Excluir a máquina "{{ mq.nome }}"?</h3>
+      <div class="alert a-hot">
+        <app-icon name="alert" />
+        <div>
+          @if (mq.diario.length > 0) {
+            Isso vai apagar <b>{{ mq.diario.length }} lançamento(s)</b> do diário.
+            Os adiantamentos e despesas ligados a ela <b>continuam no financeiro</b>,
+            mas sem o vínculo com a máquina.
+          } @else {
+            Esta máquina não tem lançamentos.
+          }
+          <div style="margin-top:6px">Esta ação <b>não pode ser desfeita</b>.</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+        <button class="btn btn-o" (click)="excluirAberto.set(false)">Cancelar</button>
+        <button class="btn btn-p" style="background:var(--pocket)"
+                (click)="confirmarExclusao()" [disabled]="excluindo()">
+          {{ excluindo() ? 'Excluindo…' : 'Excluir máquina' }}
+        </button>
+      </div>
+    </app-modal>
   }
 }
