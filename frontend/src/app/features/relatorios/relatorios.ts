@@ -4,14 +4,22 @@ import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/api.service';
 import { Icon } from '../../core/icon';
 import { STATUS_BADGE } from '../../core/labels';
-import { Ajudante, Fechamento, Maquina } from '../../core/models';
+import { Ajudante, Fechamento, Maquina, Servico } from '../../core/models';
 import { AjudanteService } from '../../core/services/ajudante.service';
 import { FechamentoService } from '../../core/services/fechamento.service';
 import { MaquinaService } from '../../core/services/maquina.service';
+import { ServicoService } from '../../core/services/servico.service';
 import { formatDate, primeiroDiaMesIso, todayIso } from '../../core/format';
 import { Modal } from '../../shared/modal';
 
-type TipoRel = 'maquina' | 'periodo' | 'ajudantes' | 'entradas' | 'fechamento' | 'resultado';
+type TipoRel =
+  | 'maquina'
+  | 'servico'
+  | 'periodo'
+  | 'ajudantes'
+  | 'entradas'
+  | 'fechamento'
+  | 'resultado';
 
 interface CardRel {
   tipo: TipoRel;
@@ -28,6 +36,7 @@ interface CardRel {
 export class RelatoriosPage implements OnInit {
   private api = inject(ApiService);
   private maquinasSvc = inject(MaquinaService);
+  private servicosSvc = inject(ServicoService);
   private ajudantesSvc = inject(AjudanteService);
   private fechamentosSvc = inject(FechamentoService);
 
@@ -44,6 +53,7 @@ export class RelatoriosPage implements OnInit {
 
   CARDS: CardRel[] = [
     { tipo: 'maquina', titulo: 'Relatório por máquina', desc: 'Diário completo, custos, horas e margem de uma máquina.' },
+    { tipo: 'servico', titulo: 'Relatório por serviço', desc: 'Diário, custo, resultado e horas de um serviço avulso.' },
     { tipo: 'periodo', titulo: 'Relatório do período (todas)', desc: 'Tudo que rodou no período, consolidado máquina a máquina.' },
     { tipo: 'ajudantes', titulo: 'Saídas — ajudantes', desc: 'Quanto cada ajudante recebeu, com a origem de cada pagamento.' },
     { tipo: 'entradas', titulo: 'Entradas — recebimentos', desc: 'Adiantamentos e fechamentos recebidos da EPR.' },
@@ -52,6 +62,7 @@ export class RelatoriosPage implements OnInit {
   ];
 
   maquinas = signal<Maquina[]>([]);
+  servicos = signal<Servico[]>([]);
   ajudantes = signal<Ajudante[]>([]);
   fechamentos = signal<Fechamento[]>([]);
 
@@ -61,6 +72,7 @@ export class RelatoriosPage implements OnInit {
 
   // parâmetros
   rMaquinaId = '';
+  rServicoId = '';
   rDe = primeiroDiaMesIso();
   rAte = todayIso();
   rAjudanteId = '';
@@ -69,6 +81,7 @@ export class RelatoriosPage implements OnInit {
 
   ngOnInit(): void {
     this.maquinasSvc.listar().subscribe((ms) => this.maquinas.set(ms));
+    this.servicosSvc.listar().subscribe((ss) => this.servicos.set(ss));
     this.ajudantesSvc.listar(true).subscribe((as) => this.ajudantes.set(as));
     this.fechamentosSvc.listar().subscribe((fs) => {
       this.fechamentos.set(fs);
@@ -137,6 +150,10 @@ export class RelatoriosPage implements OnInit {
       case 'maquina':
         if (!this.rMaquinaId) { this.erro.set('Escolha a máquina.'); return; }
         caminho = `/pdf/maquina/${this.rMaquinaId}`;
+        break;
+      case 'servico':
+        if (!this.rServicoId) { this.erro.set('Escolha o serviço.'); return; }
+        caminho = `/pdf/servico/${this.rServicoId}`;
         break;
       case 'periodo':
         caminho = '/pdf/periodo';

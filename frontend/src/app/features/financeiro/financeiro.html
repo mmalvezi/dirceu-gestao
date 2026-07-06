@@ -34,7 +34,7 @@
         @for (r of recebs(); track r.id) {
           <div class="row">
             <div>
-              <b>{{ r.tipo === 'adiantamento' ? 'Adiantamento' : 'Fechamento' }}</b>@if (r.maquina_nome) { — {{ r.maquina_nome }}}
+              <b>{{ r.tipo === 'adiantamento' ? 'Adiantamento' : 'Fechamento' }}</b>@if (r.maquina_nome) { — {{ r.maquina_nome }}} @else if (r.servico_nome) { — {{ r.servico_nome }}}
               <div class="tiny">{{ fmtData(r.data) }}@if (r.obs) { · {{ r.obs }}}</div>
               @if (editavel(r)) {
                 <div style="display:flex;gap:10px;margin-top:3px">
@@ -79,7 +79,7 @@
         @for (p of pagamentos(); track $index) {
           <div class="row">
             <div>
-              <b>{{ p.ajudante_nome }}</b> — {{ p.maquina_nome }}
+              <b>{{ p.ajudante_nome }}</b> — {{ p.origem_nome }}
               <div class="tiny">{{ fmtData(p.data) }} · {{ fmtHoras(p.horas) }}h</div>
             </div>
             <div style="text-align:right">
@@ -175,7 +175,7 @@
       @for (d of despesas(); track d.id) {
         <div class="row">
           <div>
-            <b>{{ d.descricao || catLabel[d.categoria] }}</b>@if (d.maquina_nome) { — {{ d.maquina_nome }}}
+            <b>{{ d.descricao || catLabel[d.categoria] }}</b>@if (d.maquina_nome) { — {{ d.maquina_nome }}} @else if (d.servico_nome) { — {{ d.servico_nome }}}
             <div class="tiny">{{ fmtData(d.data) }}</div>
             <div style="display:flex;gap:10px;margin-top:3px">
               <button class="tiny" style="background:none;border:0;color:var(--slate)" (click)="abrirDespesa(d)">Editar</button>
@@ -220,12 +220,19 @@
     <div class="f"><label>Descrição</label>
       <input [(ngModel)]="dpDescricao" name="dpDescricao" placeholder="Ex.: combustível ida à usina" /></div>
     <div class="f">
-      <label>Máquina (opcional)</label>
-      <select [(ngModel)]="dpMaquinaId" name="dpMaquinaId">
+      <label>Vincular a (opcional)</label>
+      <select [(ngModel)]="dpVinculo" name="dpVinculo">
         <option value="">Sem vínculo</option>
-        @for (m of maquinasAbertas(); track m.id) {
-          <option [value]="m.id">{{ m.nome }} — {{ m.cliente }}</option>
-        }
+        <optgroup label="Máquinas">
+          @for (m of maquinasAbertas(); track m.id) {
+            <option [value]="'maq:' + m.id">{{ m.nome }} — {{ m.cliente }}</option>
+          }
+        </optgroup>
+        <optgroup label="Serviços avulsos">
+          @for (s of servicosAbertos(); track s.id) {
+            <option [value]="'svc:' + s.id">{{ s.descricao }}</option>
+          }
+        </optgroup>
       </select>
     </div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
@@ -249,12 +256,19 @@
         <input type="number" inputmode="decimal" min="0" [(ngModel)]="adValor" name="adValor" /></div>
     </div>
     <div class="f">
-      <label>Máquina (opcional)</label>
-      <select [(ngModel)]="adMaquinaId" name="adMaquinaId">
+      <label>Vincular a (opcional)</label>
+      <select [(ngModel)]="adVinculo" name="adVinculo">
         <option value="">Sem vínculo</option>
-        @for (m of maquinasAbertas(); track m.id) {
-          <option [value]="m.id">{{ m.nome }} — {{ m.cliente }}</option>
-        }
+        <optgroup label="Máquinas">
+          @for (m of maquinasAbertas(); track m.id) {
+            <option [value]="'maq:' + m.id">{{ m.nome }} — {{ m.cliente }}</option>
+          }
+        </optgroup>
+        <optgroup label="Serviços avulsos">
+          @for (s of servicosAbertos(); track s.id) {
+            <option [value]="'svc:' + s.id">{{ s.descricao }}</option>
+          }
+        </optgroup>
       </select>
     </div>
     <div class="f"><label>Observações</label><textarea rows="2" [(ngModel)]="adObs" name="adObs"></textarea></div>

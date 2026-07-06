@@ -31,6 +31,17 @@ export const routes: Routes = [
           import('./features/maquinas/maquina-detalhe').then((m) => m.MaquinaDetalhePage),
       },
       {
+        path: 'servicos',
+        title: 'Serviços — Dirceu',
+        loadComponent: () => import('./features/servicos/servicos').then((m) => m.ServicosPage),
+      },
+      {
+        path: 'servicos/:id',
+        title: 'Serviço — Dirceu',
+        loadComponent: () =>
+          import('./features/servicos/servico-detalhe').then((m) => m.ServicoDetalhePage),
+      },
+      {
         path: 'financeiro',
         title: 'Financeiro — Dirceu',
         loadComponent: () => import('./features/financeiro/financeiro').then((m) => m.FinanceiroPage),

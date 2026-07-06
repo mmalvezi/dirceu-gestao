@@ -1,4 +1,9 @@
 <section class="screen">
+  <div class="seg" style="margin-bottom:14px">
+    <a routerLink="/maquinas" routerLinkActive="on" [routerLinkActiveOptions]="{ exact: true }">Máquinas</a>
+    <a routerLink="/servicos" routerLinkActive="on" [routerLinkActiveOptions]="{ exact: true }">Serviços avulsos</a>
+  </div>
+
   <div class="row" style="margin-bottom:12px">
     <div class="h-sec" style="margin:0">Máquinas · empreitas</div>
     <button class="btn btn-p btn-s" (click)="formAberto.set(true)">+ Nova máquina</button>

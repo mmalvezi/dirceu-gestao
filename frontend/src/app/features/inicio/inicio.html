@@ -72,20 +72,23 @@
         </div>
       </div>
       <div class="card">
-        <div class="h-sec" style="margin-top:0">Margem das máquinas em andamento</div>
+        <div class="h-sec" style="margin-top:0">Margem dos trabalhos em andamento</div>
         @if (d.maquinas_andamento.length === 0) {
-          <p class="muted">Nenhuma máquina em andamento.</p>
+          <p class="muted">Nenhum trabalho em andamento.</p>
         }
         <div class="list">
-          @for (m of d.maquinas_andamento; track m.id) {
-            <div style="cursor:pointer" (click)="abrirMaquina(m.id)">
-              <div class="row"><b>{{ m.nome }}</b><span class="muted">{{ m.pct_consumido }}% da empreita</span></div>
+          @for (m of d.maquinas_andamento; track m.tipo + '-' + m.id) {
+            <div style="cursor:pointer" (click)="abrirTrabalho(m)">
+              <div class="row">
+                <b>{{ m.nome }}@if (m.tipo === 'servico') { <span class="tiny">(serviço)</span> }</b>
+                <span class="muted">{{ m.pct_consumido }}% consumido</span>
+              </div>
               <div class="bar" style="margin-top:6px">
                 <i class="{{ barraClasse(m.pct_consumido) }}"
                    [style.width.%]="m.pct_consumido > 100 ? 100 : m.pct_consumido"></i>
               </div>
               <div class="tiny" style="margin-top:4px">
-                seu custo {{ fmtMoney(m.custo_dirceu) }} · empreita {{ fmtMoney(m.empreita) }} · margem hoje
+                seu custo {{ fmtMoney(m.custo_dirceu) }} · {{ m.tipo === 'servico' ? 'valor' : 'empreita' }} {{ fmtMoney(m.empreita) }} · margem hoje
                 <b class="val" [class.pos]="m.margem >= 0" [class.neg]="m.margem < 0">{{ fmtMoney(m.margem) }}</b>
               </div>
             </div>

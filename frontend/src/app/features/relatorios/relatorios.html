@@ -20,6 +20,7 @@
     <h3>
       @switch (tipo) {
         @case ('maquina') { Relatório por máquina }
+        @case ('servico') { Relatório por serviço }
         @case ('periodo') { Relatório do período }
         @case ('ajudantes') { Saídas — ajudantes }
         @case ('entradas') { Entradas — recebimentos }
@@ -31,6 +32,18 @@
 
     @if (erro()) {
       <div class="alert a-hot"><app-icon name="alert" /><div>{{ erro() }}</div></div>
+    }
+
+    @if (tipo === 'servico') {
+      <div class="f">
+        <label>Serviço</label>
+        <select [(ngModel)]="rServicoId" name="rServicoId">
+          <option value="" disabled>Escolha…</option>
+          @for (s of servicos(); track s.id) {
+            <option [value]="s.id">{{ s.descricao }}{{ s.cliente ? ' — ' + s.cliente : '' }}</option>
+          }
+        </select>
+      </div>
     }
 
     @if (tipo === 'maquina') {
@@ -113,7 +126,7 @@
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
       <button class="btn btn-o" (click)="modal.set(null)">Cancelar</button>
       <button class="btn btn-p" (click)="gerar()"
-              [disabled]="gerando() || (modal() === 'maquina' && !rMaquinaId)">
+              [disabled]="gerando() || (modal() === 'maquina' && !rMaquinaId) || (modal() === 'servico' && !rServicoId)">
         <app-icon name="pdf" /> {{ gerando() ? 'Gerando…' : 'Gerar PDF' }}
       </button>
     </div>

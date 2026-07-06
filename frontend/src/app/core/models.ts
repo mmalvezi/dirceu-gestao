@@ -88,6 +88,44 @@ export interface ExclusaoMaquina {
   despesas_desvinculadas: number;
 }
 
+// ----- Serviços avulsos -----
+
+export type ServicoStatus = 'aberto' | 'finalizado' | 'fechado';
+
+export interface Servico {
+  id: number;
+  descricao: string;
+  cliente: string | null;
+  valor: number;
+  status: ServicoStatus;
+  data_inicio: string;
+  data_finalizacao: string | null;
+  obs: string | null;
+  custo_dirceu: number;
+  custo_bolso_diarias: number;
+  custo_despesas: number;
+  custo_epr: number;
+  horas: number;
+  resultado: number;
+  pct_consumido: number;
+  ultimo_lancamento: UltimoLancamento | null;
+}
+
+export interface ServicoEntrada {
+  id: number;
+  servico_id: number;
+  data: string;
+  descricao: string;
+  trabalhos: Trabalho[];
+  total_horas: number;
+  total_valor: number;
+  aviso?: string | null;
+}
+
+export interface ServicoDetalhe extends Servico {
+  diario: ServicoEntrada[];
+}
+
 export interface Recebimento {
   id: number;
   tipo: RecebimentoTipo;
@@ -95,6 +133,8 @@ export interface Recebimento {
   valor: number;
   maquina_id: number | null;
   maquina_nome: string | null;
+  servico_id: number | null;
+  servico_nome: string | null;
   status: RecebimentoStatus;
   fechamento_id: number | null;
   obs: string | null;
@@ -111,8 +151,9 @@ export interface Pagamento {
   data: string;
   ajudante_id: number | null;
   ajudante_nome: string;
-  maquina_id: number;
-  maquina_nome: string;
+  origem_id: number;
+  origem_nome: string; // nome da máquina ou descrição do serviço
+  origem_tipo: 'maquina' | 'servico';
   horas: number;
   valor: number;
   origem: Origem;
@@ -141,9 +182,19 @@ export interface Despesa {
   descricao: string | null;
   maquina_id: number | null;
   maquina_nome: string | null;
+  servico_id: number | null;
+  servico_nome: string | null;
 }
 
 // ----- Fechamento -----
+
+export interface FechamentoServico {
+  id: number;
+  descricao: string;
+  cliente: string | null;
+  valor: number;
+  data_finalizacao: string | null;
+}
 
 export interface FechamentoMaquina {
   id: number;
@@ -159,12 +210,15 @@ export interface FechamentoAdiantamento {
   valor: number;
   maquina_id: number | null;
   maquina_nome: string | null;
+  servico_id: number | null;
+  servico_nome: string | null;
 }
 
 export interface FechamentoPrevia {
   periodo_de: string;
   periodo_ate: string;
   maquinas: FechamentoMaquina[];
+  servicos: FechamentoServico[];
   adiantamentos: FechamentoAdiantamento[];
   total_devido: number;
   total_adiantado: number;
@@ -183,6 +237,7 @@ export interface Fechamento {
   saldo: number;
   obs: string | null;
   maquinas: FechamentoMaquina[];
+  servicos: FechamentoServico[];
 }
 
 export interface FechamentoDetalhe extends Fechamento {
@@ -243,6 +298,7 @@ export interface MaquinaAndamento {
   custo_dirceu: number;
   margem: number;
   pct_consumido: number;
+  tipo: 'maquina' | 'servico';
 }
 
 export interface Aviso {
@@ -250,6 +306,7 @@ export interface Aviso {
   texto: string;
   tipo: 'fechamento_pendente' | 'custo_alto' | 'caixa' | 'adiantamento_antigo' | null;
   maquina_id: number | null;
+  servico_id: number | null;
 }
 
 export interface Dashboard {

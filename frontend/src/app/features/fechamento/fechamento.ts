@@ -121,6 +121,6 @@ export class FechamentoPage implements OnInit {
   }
 
   nomesMaquinas(f: Fechamento): string {
-    return f.maquinas.map((m) => m.nome).join(', ');
+    return [...f.maquinas.map((m) => m.nome), ...f.servicos.map((s) => s.descricao)].join(', ');
   }
 }

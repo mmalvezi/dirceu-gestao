@@ -1,10 +1,16 @@
-import { MaquinaStatus, Origem } from './models';
+import { MaquinaStatus, Origem, ServicoStatus } from './models';
 
 /** Textos/classes do protótipo (ST e ORG). */
 export const STATUS_BADGE: Record<MaquinaStatus, [string, string]> = {
   andamento: ['Em andamento', 'b-and'],
   finalizada: ['Finalizada · aguardando fechamento', 'b-fin'],
   fechada: ['Fechada e recebida', 'b-fech'],
+};
+
+export const STATUS_SERVICO: Record<ServicoStatus, [string, string]> = {
+  aberto: ['Aberto', 'b-and'],
+  finalizado: ['Finalizado · aguardando fechamento', 'b-fin'],
+  fechado: ['Fechado e recebido', 'b-fech'],
 };
 
 export const ORIGEM_CHIP: Record<Origem | 'proprio', [string, string]> = {

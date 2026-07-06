@@ -1,0 +1,99 @@
+<section class="screen">
+  <div class="seg" style="margin-bottom:14px">
+    <a routerLink="/maquinas" routerLinkActive="on" [routerLinkActiveOptions]="{ exact: true }">Máquinas</a>
+    <a routerLink="/servicos" routerLinkActive="on" [routerLinkActiveOptions]="{ exact: true }">Serviços avulsos</a>
+  </div>
+
+  <div class="row" style="margin-bottom:12px">
+    <div class="h-sec" style="margin:0">Serviços avulsos</div>
+    <button class="btn btn-p btn-s" (click)="formAberto.set(true)">+ Novo serviço</button>
+  </div>
+
+  <div class="seg">
+    @for (f of FILTROS; track f[0]) {
+      <button [class.on]="filtro() === f[0]" (click)="setFiltro(f[0])">{{ f[1] }}</button>
+    }
+  </div>
+
+  <div class="f" style="margin-bottom:14px">
+    <input [(ngModel)]="q" name="q" (ngModelChange)="buscou()"
+           placeholder="Buscar por descrição ou cliente…" />
+  </div>
+
+  @if (carregou() && servicos().length === 0) {
+    <div class="card" style="text-align:center;padding:28px">
+      <p style="font-weight:600;margin-bottom:4px">
+        {{ filtro() || q ? 'Nenhum serviço encontrado.' : 'Nenhum serviço avulso ainda.' }}
+      </p>
+      <p class="muted">
+        {{ filtro() || q
+            ? 'Tente outro filtro ou busca.'
+            : 'Serviços pontuais (uma peça, um reparo) que você recebe e que entram no fechamento.' }}
+      </p>
+      @if (!filtro() && !q) {
+        <button class="btn btn-p" style="margin-top:14px" (click)="formAberto.set(true)">
+          + Novo serviço
+        </button>
+      }
+    </div>
+  }
+
+  <div class="grid g2">
+    @for (s of servicos(); track s.id) {
+      <div class="card mq" (click)="abrir(s)">
+        <div class="top">
+          <div><h3>{{ truncar(s.descricao, 40) }}</h3><div class="cli">{{ s.cliente || 'Sem cliente' }}</div></div>
+          <span class="badge {{ badge[s.status][1] }}">{{ badge[s.status][0] }}</span>
+        </div>
+        <div class="bar">
+          <i class="{{ barCls(s.pct_consumido) }}"
+             [style.width.%]="s.pct_consumido > 100 ? 100 : s.pct_consumido"></i>
+        </div>
+        <div class="nums">
+          <div><b>Valor</b><span>{{ fmtMoney(s.valor) }}</span></div>
+          <div><b>Seu custo</b><span>{{ fmtMoney(s.custo_dirceu) }}</span></div>
+          <div><b>Resultado</b><span [class.pos]="s.resultado >= 0" [class.neg]="s.resultado < 0">{{ fmtMoney(s.resultado) }}</span></div>
+          <div><b>Horas</b><span>{{ fmtHoras(s.horas) }}h</span></div>
+        </div>
+        @if (s.custo_epr > 0) {
+          <div class="tiny" style="margin-bottom:3px">EPR pagou: {{ fmtMoney(s.custo_epr) }} (fora do resultado)</div>
+        }
+        <div class="tiny">
+          @if (s.ultimo_lancamento) {
+            Último lançamento: {{ fmtDataCurta(s.ultimo_lancamento.data) }} — {{ truncar(s.ultimo_lancamento.descricao) }}
+          } @else {
+            Sem lançamentos ainda
+          }
+        </div>
+      </div>
+    }
+  </div>
+</section>
+
+@if (formAberto()) {
+  <app-servico-form (salvo)="aoSalvarServico()" (fechado)="formAberto.set(false)" />
+}
+
+@if (pickerAberto()) {
+  <app-modal (fechado)="pickerAberto.set(false)">
+    <h3>Lançar dia em qual serviço?</h3>
+    <div class="muted">Só serviços ainda não fechados</div>
+    <div class="list">
+      @for (s of lancavel(); track s.id) {
+        <div class="row" style="cursor:pointer" (click)="escolherParaLancar(s)">
+          <div><b>{{ truncar(s.descricao, 40) }}</b><div class="tiny">{{ s.cliente || 'Sem cliente' }}</div></div>
+          <span class="badge {{ badge[s.status][1] }}">{{ badge[s.status][0] }}</span>
+        </div>
+      }
+    </div>
+    <div style="display:flex;justify-content:flex-end;margin-top:12px">
+      <button class="btn btn-o" (click)="pickerAberto.set(false)">Cancelar</button>
+    </div>
+  </app-modal>
+}
+
+@if (lancarEm(); as s) {
+  <app-lancar-dia [maquinaId]="s.id" [maquinaNome]="s.descricao" [maquinaCliente]="s.cliente || ''"
+                  alvo="servico"
+                  (salvo)="aoLancar()" (fechado)="lancarEm.set(null)" />
+}

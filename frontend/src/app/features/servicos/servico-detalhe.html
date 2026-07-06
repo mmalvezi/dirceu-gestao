@@ -1,73 +1,73 @@
 <section class="screen">
-  <app-voltar rotulo="Máquinas" fallback="/maquinas" />
+  <app-voltar rotulo="Serviços" fallback="/servicos" />
 
   @if (aviso()) {
     <div class="alert a-warn"><app-icon name="alert" /><div>{{ aviso() }}</div></div>
   }
 
-  @if (m(); as mq) {
+  @if (s(); as sv) {
     <div class="card">
       <div class="top row" style="align-items:flex-start">
         <div>
-          <h3 class="disp" style="font-size:20px">{{ mq.nome }}</h3>
-          <div class="cli muted">{{ mq.cliente }}</div>
+          <h3 class="disp" style="font-size:20px">{{ sv.descricao }}</h3>
+          <div class="cli muted">{{ sv.cliente || 'Sem cliente' }}</div>
         </div>
-        <span class="badge {{ badge[mq.status][1] }}">{{ badge[mq.status][0] }}</span>
+        <span class="badge {{ badge[sv.status][1] }}">{{ badge[sv.status][0] }}</span>
       </div>
       <div class="grid g4" style="margin-top:12px">
-        <div><b class="tiny">EMPREITA</b><div class="val" style="font-size:17px">{{ fmtMoney(mq.empreita) }}</div></div>
-        <div><b class="tiny">SEU CUSTO</b><div class="val" style="font-size:17px">{{ fmtMoney(mq.custo_dirceu) }}</div></div>
-        <div><b class="tiny">MARGEM HOJE</b><div class="val" style="font-size:17px" [class.pos]="mq.margem >= 0" [class.neg]="mq.margem < 0">{{ fmtMoney(mq.margem) }}</div></div>
-        <div><b class="tiny">HORAS</b><div class="val" style="font-size:17px">{{ fmtHoras(mq.horas) }}h</div></div>
+        <div><b class="tiny">VALOR</b><div class="val" style="font-size:17px">{{ fmtMoney(sv.valor) }}</div></div>
+        <div><b class="tiny">SEU CUSTO</b><div class="val" style="font-size:17px">{{ fmtMoney(sv.custo_dirceu) }}</div></div>
+        <div><b class="tiny">RESULTADO</b><div class="val" style="font-size:17px" [class.pos]="sv.resultado >= 0" [class.neg]="sv.resultado < 0">{{ fmtMoney(sv.resultado) }}</div></div>
+        <div><b class="tiny">HORAS</b><div class="val" style="font-size:17px">{{ fmtHoras(sv.horas) }}h</div></div>
       </div>
       <div class="bar" style="margin-top:12px">
-        <i class="{{ barCls(mq.pct_consumido) }}"
-           [style.width.%]="mq.pct_consumido > 100 ? 100 : mq.pct_consumido"></i>
+        <i class="{{ barCls(sv.pct_consumido) }}"
+           [style.width.%]="sv.pct_consumido > 100 ? 100 : sv.pct_consumido"></i>
       </div>
-      <div class="tiny" style="margin-top:5px">{{ mq.pct_consumido }}% da empreita consumida pelo seu custo</div>
-      @if (mq.custo_despesas > 0) {
+      <div class="tiny" style="margin-top:5px">{{ sv.pct_consumido }}% do valor consumido pelo seu custo</div>
+      @if (sv.custo_despesas > 0) {
         <div class="tiny" style="margin-top:3px">
-          Seu custo: {{ fmtMoney(mq.custo_bolso_diarias) }} diárias + {{ fmtMoney(mq.custo_despesas) }} despesas
+          Seu custo: {{ fmtMoney(sv.custo_bolso_diarias) }} diárias + {{ fmtMoney(sv.custo_despesas) }} despesas
         </div>
       }
-      @if (mq.custo_epr > 0) {
-        <div class="tiny" style="margin-top:3px">EPR pagou: {{ fmtMoney(mq.custo_epr) }} (fora da margem)</div>
+      @if (sv.custo_epr > 0) {
+        <div class="tiny" style="margin-top:3px">EPR pagou: {{ fmtMoney(sv.custo_epr) }} (fora do resultado)</div>
       }
 
       <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
-        @if (mq.status !== 'fechada') {
+        @if (sv.status !== 'fechado') {
           <button class="btn btn-p btn-s" (click)="lancarAberto.set(true)">+ Lançar dia</button>
         }
         <button class="btn btn-o btn-s" (click)="abrirPdf()">
-          <app-icon name="pdf" /> PDF da máquina
+          <app-icon name="pdf" /> PDF do serviço
         </button>
-        @if (mq.status === 'andamento') {
-          <button class="btn btn-o btn-s" (click)="editarMaquina.set(true)">Editar</button>
-          <button class="btn btn-o btn-s" (click)="finalizar()">Finalizar máquina</button>
+        @if (sv.status === 'aberto') {
+          <button class="btn btn-o btn-s" (click)="editarServico.set(true)">Editar</button>
+          <button class="btn btn-o btn-s" (click)="finalizar()">Finalizar serviço</button>
         }
-        @if (mq.status === 'finalizada') {
-          <button class="btn btn-o btn-s" (click)="editarMaquina.set(true)">Editar</button>
+        @if (sv.status === 'finalizado') {
+          <button class="btn btn-o btn-s" (click)="editarServico.set(true)">Editar</button>
           <button class="btn btn-o btn-s" (click)="reabrir()">Reabrir</button>
         }
-        @if (mq.status !== 'fechada') {
+        @if (sv.status !== 'fechado') {
           <button class="btn btn-o btn-s" style="color:var(--pocket)" (click)="excluirAberto.set(true)">
-            Excluir máquina
+            Excluir serviço
           </button>
         } @else {
-          <span class="tiny" style="align-self:center">Máquinas fechadas não podem ser excluídas.</span>
+          <span class="tiny" style="align-self:center">Serviços fechados não podem ser excluídos.</span>
         }
       </div>
     </div>
 
-    <div class="h-sec">Diário de obra</div>
-    @if (mq.diario.length === 0) {
+    <div class="h-sec">Diário do serviço</div>
+    @if (sv.diario.length === 0) {
       <div class="card"><p class="muted">Nenhum dia lançado ainda — use o "+ Lançar dia".</p></div>
     }
-    @for (e of mq.diario; track e.id) {
+    @for (e of sv.diario; track e.id) {
       <div class="day">
         <div class="row">
           <div class="dt">{{ fmtDia(e.data) }}</div>
-          @if (mq.status !== 'fechada') {
+          @if (sv.status !== 'fechado') {
             <div style="display:flex;gap:10px">
               <button class="tiny" style="background:none;border:0;color:var(--slate)" (click)="editarEntrada.set(e)">Editar</button>
               <button class="tiny" style="background:none;border:0;color:var(--pocket)" (click)="excluirEntrada(e)">Excluir</button>
@@ -94,33 +94,34 @@
   }
 </section>
 
-@if (m(); as mq) {
+@if (s(); as sv) {
   @if (lancarAberto()) {
-    <app-lancar-dia [maquinaId]="mq.id" [maquinaNome]="mq.nome" [maquinaCliente]="mq.cliente"
+    <app-lancar-dia [maquinaId]="sv.id" [maquinaNome]="sv.descricao" [maquinaCliente]="sv.cliente || ''"
+                    alvo="servico"
                     (salvo)="aoSalvarDia($any($event))" (fechado)="lancarAberto.set(false)" />
   }
   @if (editarEntrada(); as entrada) {
-    <app-lancar-dia [maquinaId]="mq.id" [maquinaNome]="mq.nome" [maquinaCliente]="mq.cliente"
-                    [entrada]="entrada"
+    <app-lancar-dia [maquinaId]="sv.id" [maquinaNome]="sv.descricao" [maquinaCliente]="sv.cliente || ''"
+                    alvo="servico" [entrada]="entrada"
                     (salvo)="aoSalvarDia($any($event))" (fechado)="editarEntrada.set(null)" />
   }
-  @if (editarMaquina()) {
-    <app-maquina-form [maquina]="mq"
-                      (salvo)="editarMaquina.set(false); carregar()"
-                      (fechado)="editarMaquina.set(false)" />
+  @if (editarServico()) {
+    <app-servico-form [servico]="sv"
+                      (salvo)="editarServico.set(false); carregar()"
+                      (fechado)="editarServico.set(false)" />
   }
   @if (excluirAberto()) {
     <app-modal (fechado)="excluirAberto.set(false)">
-      <h3>Excluir a máquina "{{ mq.nome }}"?</h3>
+      <h3>Excluir o serviço "{{ sv.descricao }}"?</h3>
       <div class="alert a-hot">
         <app-icon name="alert" />
         <div>
-          @if (mq.diario.length > 0) {
-            Isso vai apagar <b>{{ mq.diario.length }} lançamento(s)</b> do diário.
-            Os adiantamentos e despesas ligados a ela <b>continuam no financeiro</b>,
-            mas sem o vínculo com a máquina.
+          @if (sv.diario.length > 0) {
+            Isso vai apagar <b>{{ sv.diario.length }} lançamento(s)</b> do diário.
+            Os adiantamentos e despesas ligados a ele <b>continuam no financeiro</b>,
+            mas sem o vínculo com o serviço.
           } @else {
-            Esta máquina não tem lançamentos.
+            Este serviço não tem lançamentos.
           }
           <div style="margin-top:6px">Esta ação <b>não pode ser desfeita</b>.</div>
         </div>
@@ -129,7 +130,7 @@
         <button class="btn btn-o" (click)="excluirAberto.set(false)">Cancelar</button>
         <button class="btn btn-p" style="background:var(--pocket)"
                 (click)="confirmarExclusao()" [disabled]="excluindo()">
-          {{ excluindo() ? 'Excluindo…' : 'Excluir máquina' }}
+          {{ excluindo() ? 'Excluindo…' : 'Excluir serviço' }}
         </button>
       </div>
     </app-modal>

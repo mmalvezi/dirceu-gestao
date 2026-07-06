@@ -27,24 +27,32 @@
 
     @if (previa(); as p) {
       <div class="muted" style="margin:14px 0 10px">
-        Entram no período: máquinas <b>finalizadas</b> e os <b>adiantamentos em aberto</b> vinculados.
+        Entram no período: máquinas e serviços <b>finalizados</b> e os <b>adiantamentos em aberto</b> vinculados.
       </div>
 
-      @if (p.maquinas.length === 0) {
-        <p class="muted">Nenhuma máquina finalizada no período — nada a fechar.</p>
+      @if (p.maquinas.length === 0 && p.servicos.length === 0) {
+        <p class="muted">Nenhuma máquina nem serviço finalizado no período — nada a fechar.</p>
       } @else {
         <div class="list">
           @for (m of p.maquinas; track m.id) {
             <div class="row">
               <div><b>{{ m.nome }}</b> — {{ m.cliente }}
-                <div class="tiny">finalizada em {{ fmtData(m.data_finalizacao) }} · empreita integral</div>
+                <div class="tiny">máquina finalizada em {{ fmtData(m.data_finalizacao) }} · empreita integral</div>
               </div>
               <span class="val pos">{{ fmtMoney(m.empreita) }}</span>
             </div>
           }
+          @for (s of p.servicos; track s.id) {
+            <div class="row">
+              <div><b>{{ s.descricao }}</b>@if (s.cliente) { — {{ s.cliente }}}
+                <div class="tiny">serviço finalizado em {{ fmtData(s.data_finalizacao) }} · valor combinado</div>
+              </div>
+              <span class="val pos">{{ fmtMoney(s.valor) }}</span>
+            </div>
+          }
           @for (a of p.adiantamentos; track a.id) {
             <div class="row">
-              <div><b>Adiantamento {{ fmtData(a.data) }}</b> — {{ a.maquina_nome || 'sem vínculo' }}
+              <div><b>Adiantamento {{ fmtData(a.data) }}</b> — {{ a.maquina_nome || a.servico_nome || 'sem vínculo' }}
                 <div class="tiny">abatido no fechamento</div>
               </div>
               <span class="val neg">− {{ fmtMoney(a.valor) }}</span>
@@ -85,7 +93,7 @@
             Registrar acerto
           </button>
           @if (!p.pode_registrar) {
-            <span class="tiny" style="align-self:center">Nenhuma máquina finalizada no período.</span>
+            <span class="tiny" style="align-self:center">Nenhuma máquina nem serviço finalizado no período.</span>
           }
         </div>
       }
@@ -122,16 +130,24 @@
           @if (detalhe(); as d) {
             @if (d.id === f.id) {
               <div style="background:var(--surf2);border-radius:9px;padding:10px 12px;margin-top:8px">
-                <div class="tiny" style="font-weight:600;margin-bottom:4px">MÁQUINAS ({{ d.maquinas.length }})</div>
-                @for (m of d.maquinas; track m.id) {
-                  <div class="row"><span>{{ m.nome }} — {{ m.cliente }}</span><span class="val">{{ fmtMoney(m.empreita) }}</span></div>
+                @if (d.maquinas.length > 0) {
+                  <div class="tiny" style="font-weight:600;margin-bottom:4px">MÁQUINAS ({{ d.maquinas.length }})</div>
+                  @for (m of d.maquinas; track m.id) {
+                    <div class="row"><span>{{ m.nome }} — {{ m.cliente }}</span><span class="val">{{ fmtMoney(m.empreita) }}</span></div>
+                  }
+                }
+                @if (d.servicos.length > 0) {
+                  <div class="tiny" style="font-weight:600;margin:8px 0 4px">SERVIÇOS ({{ d.servicos.length }})</div>
+                  @for (s of d.servicos; track s.id) {
+                    <div class="row"><span>{{ s.descricao }}@if (s.cliente) { — {{ s.cliente }}}</span><span class="val">{{ fmtMoney(s.valor) }}</span></div>
+                  }
                 }
                 <div class="tiny" style="font-weight:600;margin:8px 0 4px">ADIANTAMENTOS ABATIDOS ({{ d.adiantamentos.length }})</div>
                 @if (d.adiantamentos.length === 0) {
                   <div class="tiny">Nenhum.</div>
                 }
                 @for (a of d.adiantamentos; track a.id) {
-                  <div class="row"><span>{{ fmtData(a.data) }} — {{ a.maquina_nome || 'sem vínculo' }}</span><span class="val neg">− {{ fmtMoney(a.valor) }}</span></div>
+                  <div class="row"><span>{{ fmtData(a.data) }} — {{ a.maquina_nome || a.servico_nome || 'sem vínculo' }}</span><span class="val neg">− {{ fmtMoney(a.valor) }}</span></div>
                 }
                 <div class="row" style="margin-top:8px">
                   <span class="tiny" style="font-weight:600">devido {{ fmtMoney(d.total_devido) }} · adiantado {{ fmtMoney(d.total_adiantado) }}</span>
@@ -153,12 +169,12 @@
     <h3>Registrar o acerto?</h3>
     @if (previa(); as p) {
       <div class="muted">
-        {{ p.maquinas.length }} máquina(s) · {{ p.adiantamentos.length }} adiantamento(s) a abater ·
-        saldo {{ fmtMoney(p.saldo) }}
+        {{ p.maquinas.length }} máquina(s) · {{ p.servicos.length }} serviço(s) ·
+        {{ p.adiantamentos.length }} adiantamento(s) a abater · saldo {{ fmtMoney(p.saldo) }}
       </div>
       <div class="alert a-warn">
         <app-icon name="alert" />
-        <div><b>Esta ação é definitiva:</b> máquinas serão fechadas e adiantamentos quitados. Não há como desfazer.</div>
+        <div><b>Esta ação é definitiva:</b> máquinas e serviços serão fechados e adiantamentos quitados. Não há como desfazer.</div>
       </div>
       <div class="f">
         <label>Observações (opcional)</label>

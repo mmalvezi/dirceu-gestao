@@ -4,29 +4,29 @@ import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 import { FabService } from '../../core/fab.service';
-import { STATUS_BADGE, barClass } from '../../core/labels';
-import { Maquina } from '../../core/models';
-import { MaquinaService } from '../../core/services/maquina.service';
+import { STATUS_SERVICO, barClass } from '../../core/labels';
+import { Servico } from '../../core/models';
+import { ServicoService } from '../../core/services/servico.service';
 import { formatDateShort, formatHours, formatMoney } from '../../core/format';
 import { Modal } from '../../shared/modal';
-import { LancarDia } from './lancar-dia';
-import { MaquinaForm } from './maquina-form';
+import { LancarDia } from '../maquinas/lancar-dia';
+import { ServicoForm } from './servico-form';
 
 const FILTROS: [string, string][] = [
-  ['', 'Todas'],
-  ['andamento', 'Em andamento'],
-  ['finalizada', 'Finalizadas'],
-  ['fechada', 'Fechadas'],
+  ['', 'Todos'],
+  ['aberto', 'Abertos'],
+  ['finalizado', 'Finalizados'],
+  ['fechado', 'Fechados'],
 ];
 
-/** Lista de máquinas (scrMaquinas do protótipo). */
+/** Lista de serviços avulsos (irmã da lista de máquinas). */
 @Component({
-  selector: 'app-maquinas',
-  imports: [FormsModule, Modal, MaquinaForm, LancarDia, RouterLink, RouterLinkActive],
-  templateUrl: './maquinas.html',
+  selector: 'app-servicos',
+  imports: [FormsModule, Modal, ServicoForm, LancarDia, RouterLink, RouterLinkActive],
+  templateUrl: './servicos.html',
 })
-export class MaquinasPage implements OnInit {
-  private svc = inject(MaquinaService);
+export class ServicosPage implements OnInit {
+  private svc = inject(ServicoService);
   private router = inject(Router);
   private fab = inject(FabService);
 
@@ -34,10 +34,10 @@ export class MaquinasPage implements OnInit {
   fmtMoney = formatMoney;
   fmtHoras = formatHours;
   fmtDataCurta = formatDateShort;
-  badge = STATUS_BADGE;
+  badge = STATUS_SERVICO;
   barCls = barClass;
 
-  maquinas = signal<Maquina[]>([]);
+  servicos = signal<Servico[]>([]);
   carregou = signal(false);
   filtro = signal('');
   q = '';
@@ -45,7 +45,7 @@ export class MaquinasPage implements OnInit {
 
   formAberto = signal(false);
   pickerAberto = signal(false);
-  lancarEm = signal<Maquina | null>(null);
+  lancarEm = signal<Servico | null>(null);
 
   constructor() {
     this.fab.cliques.pipe(takeUntilDestroyed()).subscribe(() => this.abrirLancarViaFab());
@@ -56,8 +56,8 @@ export class MaquinasPage implements OnInit {
   }
 
   carregar(): void {
-    this.svc.listar(this.filtro() || undefined, this.q.trim() || undefined).subscribe((ms) => {
-      this.maquinas.set(ms);
+    this.svc.listar(this.filtro() || undefined, this.q.trim() || undefined).subscribe((ss) => {
+      this.servicos.set(ss);
       this.carregou.set(true);
     });
   }
@@ -72,37 +72,36 @@ export class MaquinasPage implements OnInit {
     this.debounce = setTimeout(() => this.carregar(), 300);
   }
 
-  abrir(m: Maquina): void {
-    this.router.navigate(['/maquinas', m.id]);
+  abrir(s: Servico): void {
+    this.router.navigate(['/servicos', s.id]);
   }
 
   truncar(s: string, n = 48): string {
     return s.length > n ? s.slice(0, n) + '…' : s;
   }
 
-  /** FAB: 1 máquina em andamento -> direto; senão, passo rápido de seleção. */
   private abrirLancarViaFab(): void {
-    const abertas = this.maquinas().filter((m) => m.status !== 'fechada');
-    const andamento = abertas.filter((m) => m.status === 'andamento');
-    if (andamento.length === 1) {
-      this.lancarEm.set(andamento[0]);
-    } else if (abertas.length > 0) {
+    const abertos = this.servicos().filter((s) => s.status !== 'fechado');
+    const abertosAtivos = abertos.filter((s) => s.status === 'aberto');
+    if (abertosAtivos.length === 1) {
+      this.lancarEm.set(abertosAtivos[0]);
+    } else if (abertos.length > 0) {
       this.pickerAberto.set(true);
     } else {
-      this.formAberto.set(true); // nada aberto: convida a criar a primeira máquina
+      this.formAberto.set(true);
     }
   }
 
-  escolherParaLancar(m: Maquina): void {
+  escolherParaLancar(s: Servico): void {
     this.pickerAberto.set(false);
-    this.lancarEm.set(m);
+    this.lancarEm.set(s);
   }
 
-  lancavel(): Maquina[] {
-    return this.maquinas().filter((m) => m.status !== 'fechada');
+  lancavel(): Servico[] {
+    return this.servicos().filter((s) => s.status !== 'fechado');
   }
 
-  aoSalvarMaquina(): void {
+  aoSalvarServico(): void {
     this.formAberto.set(false);
     this.carregar();
   }

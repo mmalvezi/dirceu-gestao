@@ -13,9 +13,11 @@ import {
   Pagamento,
   Recebimento,
   RepasseEntrada,
+  Servico,
 } from '../../core/models';
 import { FinanceiroService } from '../../core/services/financeiro.service';
 import { MaquinaService } from '../../core/services/maquina.service';
+import { ServicoService } from '../../core/services/servico.service';
 import { formatDate, formatHours, formatMoney, primeiroDiaMesIso, todayIso } from '../../core/format';
 import { Modal } from '../../shared/modal';
 
@@ -32,6 +34,7 @@ const ABAS: Aba[] = ['receb', 'pagto', 'acerto', 'despesas'];
 export class FinanceiroPage implements OnInit {
   private svc = inject(FinanceiroService);
   private maquinasSvc = inject(MaquinaService);
+  private servicosSvc = inject(ServicoService);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
 
@@ -59,14 +62,14 @@ export class FinanceiroPage implements OnInit {
   categoriaFiltro = '';
   despesas = signal<Despesa[]>([]);
 
-  // Modal despesa
+  // Modal despesa (vínculo: '' | 'maq:<id>' | 'svc:<id>')
   dpAberto = signal(false);
   dpEdit: Despesa | null = null;
   dpData = todayIso();
   dpValor: string | number | null = '';
   dpCategoria = 'deslocamento';
   dpDescricao = '';
-  dpMaquinaId = '';
+  dpVinculo = '';
   dpErro = signal('');
 
   // Modal adiantamento
@@ -74,10 +77,11 @@ export class FinanceiroPage implements OnInit {
   adEdit: Recebimento | null = null;
   adData = todayIso();
   adValor: string | number | null = '';
-  adMaquinaId = '';
+  adVinculo = '';
   adObs = '';
   adErro = signal('');
   maquinasAbertas = signal<Maquina[]>([]);
+  servicosAbertos = signal<Servico[]>([]);
 
   // Modal verba de repasse
   vbAberto = signal(false);
@@ -104,6 +108,22 @@ export class FinanceiroPage implements OnInit {
     this.maquinasSvc.listar().subscribe((ms) =>
       this.maquinasAbertas.set(ms.filter((m) => m.status !== 'fechada')),
     );
+    this.servicosSvc.listar().subscribe((ss) =>
+      this.servicosAbertos.set(ss.filter((s) => s.status !== 'fechado')),
+    );
+  }
+
+  /** '' | 'maq:<id>' | 'svc:<id>' -> {maquina_id, servico_id}. */
+  private decodeVinculo(v: string): { maquina_id: number | null; servico_id: number | null } {
+    if (v.startsWith('maq:')) return { maquina_id: Number(v.slice(4)), servico_id: null };
+    if (v.startsWith('svc:')) return { maquina_id: null, servico_id: Number(v.slice(4)) };
+    return { maquina_id: null, servico_id: null };
+  }
+
+  private encodeVinculo(maquinaId: number | null, servicoId: number | null): string {
+    if (maquinaId != null) return 'maq:' + maquinaId;
+    if (servicoId != null) return 'svc:' + servicoId;
+    return '';
   }
 
   setAba(a: Aba): void {
@@ -140,7 +160,7 @@ export class FinanceiroPage implements OnInit {
     this.dpValor = d ? d.valor : '';
     this.dpCategoria = d?.categoria ?? 'deslocamento';
     this.dpDescricao = d?.descricao ?? '';
-    this.dpMaquinaId = d?.maquina_id != null ? String(d.maquina_id) : '';
+    this.dpVinculo = this.encodeVinculo(d?.maquina_id ?? null, d?.servico_id ?? null);
     this.dpErro.set('');
     this.dpAberto.set(true);
   }
@@ -156,7 +176,7 @@ export class FinanceiroPage implements OnInit {
       valor,
       categoria: this.dpCategoria,
       descricao: this.dpDescricao.trim() || null,
-      maquina_id: this.dpMaquinaId ? Number(this.dpMaquinaId) : null,
+      ...this.decodeVinculo(this.dpVinculo),
     };
     const req = this.dpEdit
       ? this.svc.atualizarDespesa(this.dpEdit.id, dados)
@@ -188,7 +208,7 @@ export class FinanceiroPage implements OnInit {
     this.adEdit = r;
     this.adData = r?.data ?? todayIso();
     this.adValor = r ? r.valor : '';
-    this.adMaquinaId = r?.maquina_id != null ? String(r.maquina_id) : '';
+    this.adVinculo = this.encodeVinculo(r?.maquina_id ?? null, r?.servico_id ?? null);
     this.adObs = r?.obs ?? '';
     this.adErro.set('');
     this.adAberto.set(true);
@@ -203,7 +223,7 @@ export class FinanceiroPage implements OnInit {
     const dados = {
       data: this.adData,
       valor,
-      maquina_id: this.adMaquinaId ? Number(this.adMaquinaId) : null,
+      ...this.decodeVinculo(this.adVinculo),
       obs: this.adObs.trim() || null,
     };
     const req = this.adEdit

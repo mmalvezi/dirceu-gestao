@@ -4,9 +4,11 @@ import { HttpErrorResponse } from '@angular/common/http';
 
 import { Icon } from '../../core/icon';
 import { ORIGEM_CHIP } from '../../core/labels';
-import { Ajudante, DiarioEntrada, Origem } from '../../core/models';
+import { Ajudante, DiarioEntrada, Origem, ServicoEntrada } from '../../core/models';
+import { Observable } from 'rxjs';
 import { AjudanteService } from '../../core/services/ajudante.service';
 import { EntradaPayload, MaquinaService } from '../../core/services/maquina.service';
+import { ServicoService } from '../../core/services/servico.service';
 import { todayIso } from '../../core/format';
 import { Modal } from '../../shared/modal';
 
@@ -31,12 +33,14 @@ export class LancarDia implements OnInit {
   maquinaId = input.required<number>();
   maquinaNome = input('');
   maquinaCliente = input('');
-  entrada = input<DiarioEntrada | null>(null); // presente = edição
+  alvo = input<'maquina' | 'servico'>('maquina'); // onde o diário é gravado
+  entrada = input<DiarioEntrada | ServicoEntrada | null>(null); // presente = edição
 
-  salvo = output<DiarioEntrada>();
+  salvo = output<DiarioEntrada | ServicoEntrada>();
   fechado = output<void>();
 
   private maquinas = inject(MaquinaService);
+  private servicos = inject(ServicoService);
   private ajudantesSvc = inject(AjudanteService);
 
   ORIGENS: [Origem, string, string][] = (['repasse', 'epr_direto', 'bolso'] as Origem[]).map(
@@ -172,9 +176,10 @@ export class LancarDia implements OnInit {
 
     const payload: EntradaPayload = { data: this.data, descricao: this.descricao.trim(), trabalhos };
     const e = this.entrada();
-    const req = e
-      ? this.maquinas.atualizarEntrada(this.maquinaId(), e.id, payload)
-      : this.maquinas.criarEntrada(this.maquinaId(), payload);
+    const svc = this.alvo() === 'servico' ? this.servicos : this.maquinas;
+    const req: Observable<DiarioEntrada | ServicoEntrada> = e
+      ? svc.atualizarEntrada(this.maquinaId(), e.id, payload)
+      : svc.criarEntrada(this.maquinaId(), payload);
 
     this.salvando.set(true);
     req.subscribe({

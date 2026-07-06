@@ -55,7 +55,10 @@ export class InicioPage implements OnInit {
   }
 
   avisoClicavel(a: Aviso): boolean {
-    return a.tipo === 'fechamento_pendente' || (a.tipo === 'custo_alto' && a.maquina_id != null);
+    return (
+      a.tipo === 'fechamento_pendente' ||
+      (a.tipo === 'custo_alto' && a.maquina_id != null)
+    );
   }
 
   clicarAviso(a: Aviso): void {
@@ -69,8 +72,9 @@ export class InicioPage implements OnInit {
     }
   }
 
-  abrirMaquina(id: number): void {
-    this.router.navigate(['/maquinas', id]);
+  /** Card de margem: navega para a máquina ou o serviço conforme o tipo. */
+  abrirTrabalho(m: { id: number; tipo: 'maquina' | 'servico' }): void {
+    this.router.navigate([m.tipo === 'servico' ? '/servicos' : '/maquinas', m.id]);
   }
 
   copiar(): void {
