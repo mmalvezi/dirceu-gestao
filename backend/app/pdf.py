@@ -303,6 +303,26 @@ def pdf_maquina(config, maquina, entradas, ag, margem, pct) -> DirceuPDF:
     _linha_fina(pdf)
 
     # ---- diário em ordem cronológica (leitura tipo história) ----
+    _render_diario(pdf, entradas)
+
+    # ---- totais ----
+    _total_box(pdf, "Seu custo total", f"R$ {moeda(ag.custo_dirceu)}")
+    pdf.set_font("helvetica", "", 8.5)
+    pdf.set_text_color(*SLATE)
+    pdf.write(5, L(f"Empreita R$ {moeda(maquina.empreita)} - seu custo R$ {moeda(ag.custo_dirceu)} = margem "))
+    pdf.set_font("helvetica", "B", 8.5)
+    pdf.set_text_color(*(IN_GREEN if margem >= 0 else POCKET_RED))
+    pdf.write(5, L(f"R$ {moeda(margem)}"))
+    pdf.set_text_color(*SLATE)
+    pdf.set_font("helvetica", "", 8.5)
+    pdf.write(5, L(f"  ({pct}% da empreita consumido)"))
+    pdf.set_text_color(*INK)
+    pdf.ln(6)
+    return pdf
+
+
+def _render_diario(pdf: DirceuPDF, entradas) -> None:
+    """Timeline do diário (reusada por máquina e serviço)."""
     _sec(pdf, "Diário de obra")
     if not entradas:
         _nada(pdf, "Nenhum lançamento no diário.")
@@ -330,7 +350,6 @@ def pdf_maquina(config, maquina, entradas, ag, margem, pct) -> DirceuPDF:
             rotulo, estilo = ORIGEM_CHIP.get(t.origem, (t.origem, "pass"))
             _chip(pdf, MARGIN + 84, y + 0.2, rotulo, estilo)
             if not getattr(t, "proprio", False):
-                # trabalho próprio (Dirceu) tem só horas — sem valor
                 pdf.set_font("courier", "", 9)
                 pdf.set_xy(PAGE_W - MARGIN - 30, y)
                 pdf.cell(30, 5, L(f"R$ {moeda(t.valor)}"), align="R")
@@ -339,25 +358,71 @@ def pdf_maquina(config, maquina, entradas, ag, margem, pct) -> DirceuPDF:
         _linha_fina(pdf)
         pdf.ln(1)
 
-    # ---- totais ----
-    _total_box(pdf, "Seu custo total", f"R$ {moeda(ag.custo_dirceu)}")
-    pdf.set_font("helvetica", "", 8.5)
-    pdf.set_text_color(*SLATE)
-    pdf.write(5, L(f"Empreita R$ {moeda(maquina.empreita)} - seu custo R$ {moeda(ag.custo_dirceu)} = margem "))
-    pdf.set_font("helvetica", "B", 8.5)
-    pdf.set_text_color(*(IN_GREEN if margem >= 0 else POCKET_RED))
-    pdf.write(5, L(f"R$ {moeda(margem)}"))
-    pdf.set_text_color(*SLATE)
-    pdf.set_font("helvetica", "", 8.5)
-    pdf.write(5, L(f"  ({pct}% da empreita consumido)"))
+
+# ==================== 1b) Dossiê do serviço avulso ====================
+
+def pdf_servico(config, servico, entradas, ag, resultado, pct) -> DirceuPDF:
+    """Análogo ao dossiê da máquina: VALOR | SEU CUSTO | RESULTADO | HORAS + diário."""
+    pdf = DirceuPDF(
+        config, "Relatório do serviço",
+        f"{servico.descricao}" + (f" - {servico.cliente}" if servico.cliente else ""),
+        rodape_id=f"Serviço: {servico.descricao[:30]}",
+    )
+    fim = data_br(servico.data_finalizacao) if servico.data_finalizacao else "em aberto"
+    meta = [
+        ("VALOR", f"R$ {moeda(servico.valor)}", INK, True),
+        ("SEU CUSTO", f"R$ {moeda(ag.custo_dirceu)}", INK, True),
+        ("RESULTADO", f"R$ {moeda(resultado)}", IN_GREEN if resultado >= 0 else POCKET_RED, True),
+        ("HORAS", f"{horas_fmt(ag.horas)}h", INK, True),
+        ("STATUS", {"aberto": "Aberto", "finalizado": "Finalizado", "fechado": "Fechado"}.get(servico.status, servico.status), INK, False),
+        ("PERÍODO", f"{data_br(servico.data_inicio)} -> {fim}", INK, False),
+    ]
+    col_w = CONTENT_W / 3
+    y0 = pdf.get_y()
+    for i, (rotulo, valor, cor, mono) in enumerate(meta):
+        cx = MARGIN + (i % 3) * col_w
+        cy = y0 + (i // 3) * 13
+        pdf.set_xy(cx, cy)
+        pdf.set_font("helvetica", "B", 6.5)
+        pdf.set_text_color(*SLATE2)
+        pdf.cell(col_w, 4, L(rotulo))
+        pdf.set_xy(cx, cy + 4)
+        pdf.set_font("courier" if mono else "helvetica", "B", 10.5)
+        pdf.set_text_color(*cor)
+        pdf.cell(col_w, 6, L(valor))
     pdf.set_text_color(*INK)
-    pdf.ln(6)
+    pdf.set_y(y0 + 27)
+    pdf.set_font("helvetica", "", 8)
+    pdf.set_text_color(*SLATE)
+    if ag.despesas > 0:
+        pdf.cell(0, 4.5, L(
+            f"Seu custo: diárias do bolso R$ {moeda(ag.bolso_diarias)} + despesas R$ {moeda(ag.despesas)}"
+        ), new_x="LMARGIN", new_y="NEXT")
+    if ag.custo_epr > 0:
+        pdf.cell(0, 4.5, L(
+            f"Pago pela EPR (fora do resultado): R$ {moeda(ag.custo_epr)}"
+            f" - repasse R$ {moeda(ag.repasse)} . direto R$ {moeda(ag.epr_direto)}"
+        ), new_x="LMARGIN", new_y="NEXT")
+    pdf.set_text_color(*INK)
+    pdf.ln(1)
+    _linha_fina(pdf)
+
+    _render_diario(pdf, entradas)
+
+    cor = IN_GREEN if resultado >= 0 else POCKET_RED
+    _total_box(pdf, "Resultado do serviço", f"R$ {moeda(resultado)}", cor=cor)
+    pdf.set_font("helvetica", "", 8.5)
+    pdf.set_text_color(*SLATE)
+    pdf.cell(0, 5, L(
+        f"Valor R$ {moeda(servico.valor)} - seu custo R$ {moeda(ag.custo_dirceu)} = resultado R$ {moeda(resultado)}"
+    ), new_x="LMARGIN", new_y="NEXT")
+    pdf.set_text_color(*INK)
     return pdf
 
 
 # ==================== 2) Consolidado do período ====================
 
-def pdf_periodo(config, de, ate, blocos, totais_gerais) -> DirceuPDF:
+def pdf_periodo(config, de, ate, blocos, totais_gerais, blocos_servicos=None, totais_servicos=None) -> DirceuPDF:
     """blocos: [{maquina, horas, bolso, despesas, custo_dirceu, epr}] — só com atividade.
 
     Custo do Dirceu (bolso + despesas) e pago pela EPR SEPARADOS — nunca somados.
@@ -426,6 +491,27 @@ def pdf_periodo(config, de, ate, blocos, totais_gerais) -> DirceuPDF:
     pdf.cell(0, 5, L(f"Pago pela EPR no período (fora da margem): R$ {moeda(totais_gerais['epr'])}"),
              new_x="LMARGIN", new_y="NEXT")
     pdf.set_text_color(*INK)
+
+    # ---- Serviços avulsos com atividade no período ----
+    if blocos_servicos:
+        _sec(pdf, "Serviços avulsos no período")
+        cols_s = [("Serviço", 78, "L"), ("Horas", 20, "R"), ("Seu custo", 40, "R"), ("Valor", 44, "R")]
+        _tab_header(pdf, cols_s)
+        for b in blocos_servicos:
+            s = b["servico"]
+            pdf.quebra_se_preciso(7)
+            y = pdf.get_y()
+            pdf.set_font("helvetica", "B", 8.5)
+            pdf.set_xy(MARGIN, y)
+            pdf.cell(78, 5.5, L(s.descricao[:46]))
+            pdf.set_font("courier", "", 8.5)
+            pdf.set_xy(MARGIN + 78, y); pdf.cell(20, 5.5, L(f"{horas_fmt(b['horas'])}h"), align="R")
+            pdf.set_xy(MARGIN + 98, y); pdf.cell(40, 5.5, L(f"R$ {moeda(b['custo_dirceu'])}"), align="R")
+            pdf.set_xy(MARGIN + 138, y); pdf.cell(44, 5.5, L(f"R$ {moeda(s.valor)}"), align="R")
+            pdf.set_y(y + 6)
+            _linha_fina(pdf)
+        if totais_servicos:
+            _total_box(pdf, "Valor total dos serviços", f"R$ {moeda(totais_servicos['valor'])}")
     return pdf
 
 

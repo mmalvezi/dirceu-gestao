@@ -7,7 +7,13 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy import false, func
 from sqlalchemy.orm import Session, selectinload
 
-from app.calc import Agregados, agregados_por_maquina, calcular_margem_pct
+from app.calc import (
+    Agregados,
+    agregados_por_maquina,
+    agregados_por_servico,
+    calcular_margem_pct,
+    ultimos_por_servico,
+)
 from app.database import get_db
 from app.models import (
     Ajudante,
@@ -19,6 +25,8 @@ from app.models import (
     Recebimento,
     RepasseEntrada,
     Servico,
+    ServicoEntrada,
+    ServicoTrabalho,
 )
 from app.pdf import (
     pdf_ajudantes,
@@ -28,6 +36,7 @@ from app.pdf import (
     pdf_maquinas_consolidado,
     pdf_periodo,
     pdf_resultado,
+    pdf_servico,
     slug,
 )
 from app.routers.config import get_config
@@ -74,6 +83,26 @@ def rel_maquina(maquina_id: int, db: Session = Depends(get_db)) -> Response:
     margem, pct = calcular_margem_pct(maquina.empreita, ag.custo_dirceu)
     pdf = pdf_maquina(get_config(db), maquina, entradas, ag, margem, pct)
     return _resp(pdf, f"maquina-{slug(maquina.nome)}.pdf")
+
+
+# -------- 1c) dossiê do serviço avulso --------
+
+@router.get("/servico/{servico_id}")
+def rel_servico(servico_id: int, db: Session = Depends(get_db)) -> Response:
+    servico = db.get(Servico, servico_id)
+    if servico is None:
+        raise HTTPException(status_code=404, detail="Serviço não encontrado")
+    entradas = (
+        db.query(ServicoEntrada)
+        .filter(ServicoEntrada.servico_id == servico_id)
+        .options(selectinload(ServicoEntrada.trabalhos))
+        .order_by(ServicoEntrada.data.asc(), ServicoEntrada.id.asc())
+        .all()
+    )
+    ag = agregados_por_servico(db, [servico_id]).get(servico_id, Agregados())
+    resultado, pct = calcular_margem_pct(servico.valor, ag.custo_dirceu)
+    pdf = pdf_servico(get_config(db), servico, entradas, ag, resultado, pct)
+    return _resp(pdf, f"servico-{slug(servico.descricao)}.pdf")
 
 
 # -------- 1b) consolidado de máquinas por status --------
@@ -180,7 +209,34 @@ def rel_periodo(de: date, ate: date, db: Session = Depends(get_db)) -> Response:
         campo: sum((b[campo] for b in blocos), Decimal("0"))
         for campo in ("horas", "bolso", "despesas", "custo_dirceu", "epr")
     }
-    pdf = pdf_periodo(get_config(db), de, ate, blocos, gerais)
+
+    # ---- serviços avulsos com atividade no período ----
+    ags_s = {}
+    srows = (
+        db.query(ServicoEntrada.servico_id, func.coalesce(func.sum(ServicoTrabalho.horas), 0))
+        .join(ServicoTrabalho, ServicoTrabalho.entrada_id == ServicoEntrada.id)
+        .filter(ServicoEntrada.data >= de, ServicoEntrada.data <= ate)
+        .group_by(ServicoEntrada.servico_id)
+        .all()
+    )
+    sids = [sid for sid, _ in srows]
+    blocos_servicos, totais_servicos = [], None
+    if sids:
+        ags = agregados_por_servico(db, sids)
+        servicos_map = {s.id: s for s in db.query(Servico).filter(Servico.id.in_(sids)).all()}
+        for sid, _h in srows:
+            s = servicos_map.get(sid)
+            if not s:
+                continue
+            ag = ags.get(sid)
+            blocos_servicos.append({
+                "servico": s, "horas": ag.horas,
+                "custo_dirceu": ag.custo_dirceu, "valor": _dec(s.valor),
+            })
+        blocos_servicos.sort(key=lambda b: -float(b["valor"]))
+        totais_servicos = {"valor": sum((b["valor"] for b in blocos_servicos), Decimal("0"))}
+
+    pdf = pdf_periodo(get_config(db), de, ate, blocos, gerais, blocos_servicos, totais_servicos)
     return _resp(pdf, f"periodo-{de.isoformat()}-a-{ate.isoformat()}.pdf")
 
 
@@ -194,7 +250,7 @@ def rel_ajudantes(
     if ajudante_id is not None and db.get(Ajudante, ajudante_id) is None:
         raise HTTPException(status_code=404, detail="Ajudante não encontrado")
 
-    query = (
+    q_maq = (
         db.query(DiarioTrabalho, DiarioEntrada.data, Maquina.nome)
         .join(DiarioEntrada, DiarioTrabalho.entrada_id == DiarioEntrada.id)
         .join(Maquina, DiarioEntrada.maquina_id == Maquina.id)
@@ -204,18 +260,30 @@ def rel_ajudantes(
             DiarioTrabalho.proprio == false(),  # horas próprias não são saída
         )
     )
+    q_svc = (
+        db.query(ServicoTrabalho, ServicoEntrada.data, Servico.descricao)
+        .join(ServicoEntrada, ServicoTrabalho.entrada_id == ServicoEntrada.id)
+        .join(Servico, ServicoEntrada.servico_id == Servico.id)
+        .filter(
+            ServicoEntrada.data >= de,
+            ServicoEntrada.data <= ate,
+            ServicoTrabalho.proprio == false(),
+        )
+    )
     if ajudante_id is not None:
-        query = query.filter(DiarioTrabalho.ajudante_id == ajudante_id)
-    rows = query.order_by(DiarioEntrada.data.asc(), DiarioTrabalho.id.asc()).all()
+        q_maq = q_maq.filter(DiarioTrabalho.ajudante_id == ajudante_id)
+        q_svc = q_svc.filter(ServicoTrabalho.ajudante_id == ajudante_id)
+    rows = list(q_maq.all()) + list(q_svc.all())
+    rows.sort(key=lambda r: r[1])  # por data
 
     grupos_map: dict[str, dict] = {}
-    for t, data_entrada, maquina_nome in rows:
+    for t, data_entrada, origem_nome in rows:
         g = grupos_map.setdefault(
             t.ajudante_nome,
             {"nome": t.ajudante_nome, "itens": [], "horas": Decimal("0"), "valor": Decimal("0")},
         )
         g["itens"].append(
-            {"data": data_entrada, "maquina": maquina_nome, "horas": t.horas,
+            {"data": data_entrada, "maquina": origem_nome, "horas": t.horas,
              "origem": t.origem, "valor": t.valor}
         )
         g["horas"] += _dec(t.horas)
@@ -264,7 +332,7 @@ def rel_resultado(de: date, ate: date, db: Session = Depends(get_db)) -> Respons
     )
     total_entradas = sum((_dec(r.valor) for r in recebimentos), Decimal("0"))
 
-    bolso_q = (
+    bolso_maq = (
         db.query(DiarioEntrada.data, DiarioTrabalho.ajudante_nome, Maquina.nome, DiarioTrabalho.valor)
         .join(DiarioTrabalho, DiarioTrabalho.entrada_id == DiarioEntrada.id)
         .join(Maquina, DiarioEntrada.maquina_id == Maquina.id)
@@ -273,9 +341,20 @@ def rel_resultado(de: date, ate: date, db: Session = Depends(get_db)) -> Respons
             DiarioEntrada.data >= de,
             DiarioEntrada.data <= ate,
         )
-        .order_by(DiarioEntrada.data.asc(), DiarioTrabalho.id.asc())
         .all()
     )
+    bolso_svc = (
+        db.query(ServicoEntrada.data, ServicoTrabalho.ajudante_nome, Servico.descricao, ServicoTrabalho.valor)
+        .join(ServicoTrabalho, ServicoTrabalho.entrada_id == ServicoEntrada.id)
+        .join(Servico, ServicoEntrada.servico_id == Servico.id)
+        .filter(
+            ServicoTrabalho.origem == "bolso",
+            ServicoEntrada.data >= de,
+            ServicoEntrada.data <= ate,
+        )
+        .all()
+    )
+    bolso_q = sorted(list(bolso_maq) + list(bolso_svc), key=lambda r: r[0])
     total_bolso = sum((_dec(v) for _, _, _, v in bolso_q), Decimal("0"))
 
     despesas = (
