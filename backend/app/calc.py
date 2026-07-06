@@ -12,7 +12,13 @@ from decimal import Decimal
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.models import Despesa, DiarioEntrada, DiarioTrabalho
+from app.models import (
+    Despesa,
+    DiarioEntrada,
+    DiarioTrabalho,
+    ServicoEntrada,
+    ServicoTrabalho,
+)
 
 ZERO = Decimal("0")
 
@@ -78,6 +84,63 @@ def agregados_por_maquina(db: Session, maquina_ids: list[int]) -> dict[int, Agre
     for mid, valor in desp:
         out.setdefault(mid, Agregados()).despesas += _dec(valor)
 
+    return out
+
+
+def agregados_por_servico(db: Session, servico_ids: list[int]) -> dict[int, Agregados]:
+    """{servico_id: Agregados} — trabalhos por origem + despesas vinculadas ao serviço."""
+    if not servico_ids:
+        return {}
+    out: dict[int, Agregados] = {}
+
+    rows = (
+        db.query(
+            ServicoEntrada.servico_id,
+            ServicoTrabalho.origem,
+            func.coalesce(func.sum(ServicoTrabalho.valor), 0),
+            func.coalesce(func.sum(ServicoTrabalho.horas), 0),
+        )
+        .join(ServicoTrabalho, ServicoTrabalho.entrada_id == ServicoEntrada.id)
+        .filter(ServicoEntrada.servico_id.in_(servico_ids))
+        .group_by(ServicoEntrada.servico_id, ServicoTrabalho.origem)
+        .all()
+    )
+    for sid, origem, valor, horas in rows:
+        ag = out.setdefault(sid, Agregados())
+        ag.horas += _dec(horas)
+        if origem == "bolso":
+            ag.bolso_diarias += _dec(valor)
+        elif origem == "repasse":
+            ag.repasse += _dec(valor)
+        elif origem == "epr_direto":
+            ag.epr_direto += _dec(valor)
+
+    desp = (
+        db.query(Despesa.servico_id, func.coalesce(func.sum(Despesa.valor), 0))
+        .filter(Despesa.servico_id.in_(servico_ids))
+        .group_by(Despesa.servico_id)
+        .all()
+    )
+    for sid, valor in desp:
+        out.setdefault(sid, Agregados()).despesas += _dec(valor)
+
+    return out
+
+
+def ultimos_por_servico(db: Session, servico_ids: list[int]) -> dict[int, dict]:
+    """{servico_id: {data, descricao}} da entrada de diário mais recente."""
+    if not servico_ids:
+        return {}
+    rows = (
+        db.query(ServicoEntrada.servico_id, ServicoEntrada.data, ServicoEntrada.descricao)
+        .filter(ServicoEntrada.servico_id.in_(servico_ids))
+        .order_by(ServicoEntrada.data.desc(), ServicoEntrada.id.desc())
+        .all()
+    )
+    out: dict[int, dict] = {}
+    for sid, data, descricao in rows:
+        if sid not in out:
+            out[sid] = {"data": data, "descricao": descricao}
     return out
 
 

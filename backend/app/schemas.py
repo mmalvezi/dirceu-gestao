@@ -156,6 +156,63 @@ class ExclusaoMaquinaOut(BaseModel):
     despesas_desvinculadas: int
 
 
+# ----- Serviços avulsos (irmão de máquina) -----
+
+class ServicoCreate(BaseModel):
+    descricao: str
+    cliente: str | None = None
+    valor: float
+    data_inicio: date
+    obs: str | None = None
+
+
+class ServicoUpdate(BaseModel):
+    descricao: str | None = None
+    cliente: str | None = None
+    valor: float | None = None
+    status: str | None = None
+    data_inicio: date | None = None
+    data_finalizacao: date | None = None
+    obs: str | None = None
+
+
+class ServicoOut(BaseModel):
+    id: int
+    descricao: str
+    cliente: str | None = None
+    valor: float
+    status: str  # aberto/finalizado/fechado
+    data_inicio: date
+    data_finalizacao: date | None = None
+    obs: str | None = None
+    custo_dirceu: float
+    custo_bolso_diarias: float
+    custo_despesas: float
+    custo_epr: float
+    horas: float
+    resultado: float  # valor − custo_dirceu
+    pct_consumido: int
+    ultimo_lancamento: UltimoLancamento | None = None
+
+
+class ServicoEntradaOut(BaseModel):
+    id: int
+    servico_id: int
+    data: date
+    descricao: str
+    trabalhos: list[TrabalhoOut]
+    total_horas: float
+    total_valor: float
+
+
+class ServicoEntradaSalvaOut(ServicoEntradaOut):
+    aviso: str | None = None
+
+
+class ServicoDetalheOut(ServicoOut):
+    diario: list[ServicoEntradaOut] = []
+
+
 # ----- Financeiro: recebimentos -----
 
 class RecebimentoCreate(BaseModel):

@@ -81,14 +81,15 @@ def _validar_entrada(payload: DiarioEntradaIn, db: Session) -> list[DiarioTrabal
     return [_montar_trabalho(t, db) for t in payload.trabalhos]
 
 
-def _montar_trabalho(t: TrabalhoIn, db: Session) -> DiarioTrabalho:
-    # "Eu trabalhei": Dirceu com horas e SEM valor (remuneração = empreita).
+def montar_trabalho_kwargs(t: TrabalhoIn, db: Session) -> dict:
+    """Valida um trabalho e devolve os kwargs (reusado por máquina E serviço)."""
+    # "Eu trabalhei": Dirceu com horas e SEM valor (remuneração = empreita/valor).
     if t.proprio:
         if t.ajudante_id is not None:
             raise HTTPException(
                 status_code=422, detail="Trabalho próprio não leva ajudante vinculado"
             )
-        return DiarioTrabalho(
+        return dict(
             ajudante_id=None,
             ajudante_nome="Dirceu",
             horas=t.horas,
@@ -114,13 +115,17 @@ def _montar_trabalho(t: TrabalhoIn, db: Session) -> DiarioTrabalho:
             )
         nome = t.ajudante_nome.strip()
 
-    return DiarioTrabalho(
+    return dict(
         ajudante_id=t.ajudante_id,
         ajudante_nome=nome,
         horas=t.horas,
         valor=t.valor,
         origem=t.origem,
     )
+
+
+def _montar_trabalho(t: TrabalhoIn, db: Session) -> DiarioTrabalho:
+    return DiarioTrabalho(**montar_trabalho_kwargs(t, db))
 
 
 def _com_aviso(entrada: DiarioEntrada, maquina: Maquina) -> DiarioEntradaSalvaOut:

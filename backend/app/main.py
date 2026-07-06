@@ -21,6 +21,7 @@ from app.routers import (
     pdf,
     recebimentos,
     repasses,
+    servicos,
 )
 from app.seed import run_seed
 
@@ -57,6 +58,7 @@ app.include_router(recebimentos.router)
 app.include_router(repasses.router)
 app.include_router(financeiro.router)
 app.include_router(despesas.router)
+app.include_router(servicos.router)
 app.include_router(fechamentos.router)
 app.include_router(dashboard.router)
 app.include_router(pdf.router)
