@@ -35,15 +35,41 @@
     }
 
     @if (tipo === 'servico') {
-      <div class="f">
-        <label>Serviço</label>
-        <select [(ngModel)]="rServicoId" name="rServicoId">
-          <option value="" disabled>Escolha…</option>
-          @for (s of servicos(); track s.id) {
-            <option [value]="s.id">{{ s.descricao }}{{ s.cliente ? ' — ' + s.cliente : '' }}</option>
-          }
-        </select>
+      <div class="seg">
+        <button type="button" [class.on]="rServicoModo === 'individual'" (click)="rServicoModo = 'individual'">Serviço individual</button>
+        <button type="button" [class.on]="rServicoModo === 'periodo'" (click)="rServicoModo = 'periodo'">Consolidado por período</button>
       </div>
+
+      @if (rServicoModo === 'periodo') {
+        <div class="f-2">
+          <div class="f"><label>De</label><input type="date" [(ngModel)]="rDe" name="rDe" /></div>
+          <div class="f"><label>Até</label><input type="date" [(ngModel)]="rAte" name="rAte" /></div>
+        </div>
+        <div class="tiny" style="margin-bottom:4px">Soma o resultado dos serviços finalizados no período (só serviços, sem máquinas).</div>
+      } @else {
+        <div class="seg">
+          @for (f of FILTROS_STATUS_SVC; track f[0]) {
+            <button type="button" [class.on]="selStatusSvc === f[0]" (click)="selStatusSvc = f[0]">{{ f[1] }}</button>
+          }
+        </div>
+        <div class="f" style="margin-bottom:8px">
+          <input [(ngModel)]="selBuscaSvc" name="selBuscaSvc" placeholder="Buscar por descrição ou cliente…" />
+        </div>
+        <div style="max-height:260px;overflow:auto;display:flex;flex-direction:column;gap:6px">
+          @for (s of servicosFiltrados(); track s.id) {
+            <div (click)="rServicoId = '' + s.id"
+                 style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:11px 12px;border:1px solid var(--line);border-radius:9px;cursor:pointer"
+                 [style.borderColor]="rServicoId === '' + s.id ? 'var(--weld)' : ''"
+                 [style.background]="rServicoId === '' + s.id ? 'var(--weld-soft)' : '#fff'">
+              <div><b style="font-size:13.5px">{{ s.descricao }}</b><div class="tiny">{{ s.cliente || 'Sem cliente' }}</div></div>
+              <span class="badge {{ badgeSvc[s.status][1] }}">{{ badgeSvc[s.status][0] }}</span>
+            </div>
+          }
+          @if (servicosFiltrados().length === 0) {
+            <p class="muted">Nenhum serviço encontrado.</p>
+          }
+        </div>
+      }
     }
 
     @if (tipo === 'maquina') {
@@ -126,7 +152,7 @@
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
       <button class="btn btn-o" (click)="modal.set(null)">Cancelar</button>
       <button class="btn btn-p" (click)="gerar()"
-              [disabled]="gerando() || (modal() === 'maquina' && !rMaquinaId) || (modal() === 'servico' && !rServicoId)">
+              [disabled]="gerando() || (modal() === 'maquina' && !rMaquinaId) || (modal() === 'servico' && rServicoModo === 'individual' && !rServicoId)">
         <app-icon name="pdf" /> {{ gerando() ? 'Gerando…' : 'Gerar PDF' }}
       </button>
     </div>

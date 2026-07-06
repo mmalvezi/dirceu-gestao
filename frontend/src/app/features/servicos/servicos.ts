@@ -1,6 +1,6 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterLink, RouterLinkActive } from '@angular/router';
+import { Router } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 import { FabService } from '../../core/fab.service';
@@ -22,7 +22,7 @@ const FILTROS: [string, string][] = [
 /** Lista de serviços avulsos (irmã da lista de máquinas). */
 @Component({
   selector: 'app-servicos',
-  imports: [FormsModule, Modal, ServicoForm, LancarDia, RouterLink, RouterLinkActive],
+  imports: [FormsModule, Modal, ServicoForm, LancarDia],
   templateUrl: './servicos.html',
 })
 export class ServicosPage implements OnInit {

@@ -1,6 +1,6 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterLink, RouterLinkActive } from '@angular/router';
+import { Router } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 import { FabService } from '../../core/fab.service';
@@ -22,7 +22,7 @@ const FILTROS: [string, string][] = [
 /** Lista de máquinas (scrMaquinas do protótipo). */
 @Component({
   selector: 'app-maquinas',
-  imports: [FormsModule, Modal, MaquinaForm, LancarDia, RouterLink, RouterLinkActive],
+  imports: [FormsModule, Modal, MaquinaForm, LancarDia],
   templateUrl: './maquinas.html',
 })
 export class MaquinasPage implements OnInit {

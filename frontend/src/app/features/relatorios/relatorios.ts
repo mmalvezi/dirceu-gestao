@@ -3,7 +3,7 @@ import { FormsModule } from '@angular/forms';
 
 import { ApiService } from '../../core/api.service';
 import { Icon } from '../../core/icon';
-import { STATUS_BADGE } from '../../core/labels';
+import { STATUS_BADGE, STATUS_SERVICO } from '../../core/labels';
 import { Ajudante, Fechamento, Maquina, Servico } from '../../core/models';
 import { AjudanteService } from '../../core/services/ajudante.service';
 import { FechamentoService } from '../../core/services/fechamento.service';
@@ -42,14 +42,21 @@ export class RelatoriosPage implements OnInit {
 
   fmtData = formatDate;
   badge = STATUS_BADGE;
+  badgeSvc = STATUS_SERVICO;
   FILTROS_STATUS: [string, string][] = [
     ['', 'Todas'], ['andamento', 'Em andamento'], ['finalizada', 'Finalizadas'], ['fechada', 'Fechadas'],
+  ];
+  FILTROS_STATUS_SVC: [string, string][] = [
+    ['', 'Todos'], ['aberto', 'Abertos'], ['finalizado', 'Finalizados'], ['fechado', 'Fechados'],
   ];
   CONSOLIDADOS: [string, string][] = [
     ['todas', 'Todas'], ['andamento', 'Em andamento'], ['finalizada', 'Finalizadas'], ['fechada', 'Fechadas'],
   ];
   selStatus = '';
   selBusca = '';
+  selStatusSvc = '';
+  selBuscaSvc = '';
+  rServicoModo: 'individual' | 'periodo' = 'individual';
 
   CARDS: CardRel[] = [
     { tipo: 'maquina', titulo: 'Relatório por máquina', desc: 'Diário completo, custos, horas e margem de uma máquina.' },
@@ -96,7 +103,22 @@ export class RelatoriosPage implements OnInit {
       this.selBusca = '';
       this.rMaquinaId = '';
     }
+    if (tipo === 'servico') {
+      this.selStatusSvc = '';
+      this.selBuscaSvc = '';
+      this.rServicoId = '';
+      this.rServicoModo = 'individual';
+    }
     this.modal.set(tipo);
+  }
+
+  servicosFiltrados(): Servico[] {
+    const q = this.selBuscaSvc.trim().toLowerCase();
+    return this.servicos().filter(
+      (s) =>
+        (!this.selStatusSvc || s.status === this.selStatusSvc) &&
+        (!q || s.descricao.toLowerCase().includes(q) || (s.cliente ?? '').toLowerCase().includes(q)),
+    );
   }
 
   selecionar(m: Maquina): void {
@@ -152,8 +174,13 @@ export class RelatoriosPage implements OnInit {
         caminho = `/pdf/maquina/${this.rMaquinaId}`;
         break;
       case 'servico':
-        if (!this.rServicoId) { this.erro.set('Escolha o serviço.'); return; }
-        caminho = `/pdf/servico/${this.rServicoId}`;
+        if (this.rServicoModo === 'periodo') {
+          caminho = '/pdf/servicos-periodo';
+          params = { de: this.rDe, ate: this.rAte };
+        } else {
+          if (!this.rServicoId) { this.erro.set('Escolha o serviço.'); return; }
+          caminho = `/pdf/servico/${this.rServicoId}`;
+        }
         break;
       case 'periodo':
         caminho = '/pdf/periodo';

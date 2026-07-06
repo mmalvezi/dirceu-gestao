@@ -28,6 +28,7 @@ export class Layout {
   nav: NavItem[] = [
     { path: '/', label: 'Início', icon: 'home', exact: true },
     { path: '/maquinas', label: 'Máquinas', icon: 'mach', exact: false },
+    { path: '/servicos', label: 'Serviços', icon: 'tool', exact: false },
     { path: '/financeiro', label: 'Financeiro', icon: 'fin', exact: false },
     { path: '/fechamento', label: 'Fechamento', icon: 'fech', exact: false },
     { path: '/relatorios', label: 'Relatórios', icon: 'rep', exact: false },
@@ -45,9 +46,9 @@ export class Layout {
       .subscribe((e) => this.url.set(e.urlAfterRedirects));
   }
 
-  /** FAB visível nas telas de máquinas (como no protótipo). */
+  /** FAB "Lançar dia" SÓ no DETALHE de uma máquina ou serviço (onde há contexto). */
   get mostraFab(): boolean {
-    return this.url().startsWith('/maquinas');
+    return /^\/(maquinas|servicos)\/\d+/.test(this.url());
   }
 
   lancarDia(): void {

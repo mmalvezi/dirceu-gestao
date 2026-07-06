@@ -37,6 +37,7 @@ from app.pdf import (
     pdf_periodo,
     pdf_resultado,
     pdf_servico,
+    pdf_servicos_periodo,
     slug,
 )
 from app.routers.config import get_config
@@ -103,6 +104,73 @@ def rel_servico(servico_id: int, db: Session = Depends(get_db)) -> Response:
     resultado, pct = calcular_margem_pct(servico.valor, ag.custo_dirceu)
     pdf = pdf_servico(get_config(db), servico, entradas, ag, resultado, pct)
     return _resp(pdf, f"servico-{slug(servico.descricao)}.pdf")
+
+
+# -------- 1d) consolidado de serviços avulsos por período --------
+
+@router.get("/servicos-periodo")
+def rel_servicos_periodo(de: date, ate: date, db: Session = Depends(get_db)) -> Response:
+    _periodo_ok(de, ate)
+
+    def _monta(servico) -> dict:
+        ag = agregados_por_servico(db, [servico.id]).get(servico.id, Agregados())
+        resultado, pct = calcular_margem_pct(servico.valor, ag.custo_dirceu)
+        entradas = (
+            db.query(ServicoEntrada)
+            .filter(ServicoEntrada.servico_id == servico.id)
+            .options(selectinload(ServicoEntrada.trabalhos))
+            .order_by(ServicoEntrada.data.desc(), ServicoEntrada.id.desc())
+            .limit(10)
+            .all()
+        )
+        total = (
+            db.query(func.count(ServicoEntrada.id))
+            .filter(ServicoEntrada.servico_id == servico.id)
+            .scalar() or 0
+        )
+        return {"servico": servico, "ag": ag, "resultado": resultado, "pct": pct,
+                "entradas": entradas, "mais_n": max(0, total - 10)}
+
+    # Finalizados/fechados no período (por data_finalizacao) → somam no resultado.
+    finalizados_q = (
+        db.query(Servico)
+        .filter(
+            Servico.status.in_(["finalizado", "fechado"]),
+            Servico.data_finalizacao >= de,
+            Servico.data_finalizacao <= ate,
+        )
+        .order_by(Servico.data_finalizacao, Servico.id)
+        .all()
+    )
+    finalizados = [_monta(s) for s in finalizados_q]
+
+    # Em andamento (aberto) com lançamentos no período → informativo, não soma.
+    abertos_ids = [
+        sid for (sid,) in (
+            db.query(ServicoEntrada.servico_id)
+            .join(Servico, ServicoEntrada.servico_id == Servico.id)
+            .filter(
+                Servico.status == "aberto",
+                ServicoEntrada.data >= de,
+                ServicoEntrada.data <= ate,
+            )
+            .distinct()
+            .all()
+        )
+    ]
+    andamento = [
+        _monta(s)
+        for s in db.query(Servico).filter(Servico.id.in_(abertos_ids)).order_by(Servico.id).all()
+    ]
+
+    totais = {
+        "valor": sum((_dec(b["servico"].valor) for b in finalizados), Decimal("0")),
+        "custo_dirceu": sum((b["ag"].custo_dirceu for b in finalizados), Decimal("0")),
+        "resultado": sum((b["resultado"] for b in finalizados), Decimal("0")),
+        "horas": sum((b["ag"].horas for b in finalizados), Decimal("0")),
+    }
+    pdf = pdf_servicos_periodo(get_config(db), de, ate, finalizados, andamento, totais)
+    return _resp(pdf, f"servicos-periodo-{de.isoformat()}-a-{ate.isoformat()}.pdf")
 
 
 # -------- 1b) consolidado de máquinas por status --------

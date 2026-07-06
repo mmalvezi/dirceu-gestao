@@ -1071,3 +1071,122 @@ def pdf_maquinas_consolidado(config, rotulo_status, blocos, totais) -> DirceuPDF
     ), new_x="LMARGIN", new_y="NEXT")
     pdf.set_text_color(*INK)
     return pdf
+
+
+# ==================== 8) Consolidado de serviços avulsos por período ====================
+
+def pdf_servicos_periodo(config, de, ate, finalizados, andamento, totais) -> DirceuPDF:
+    """Só serviços avulsos (NÃO inclui máquinas).
+
+    finalizados/andamento: [{servico, ag, resultado, pct, entradas(<=10), mais_n}].
+    O RESULTADO consolidado soma apenas os FINALIZADOS no período (ganho real).
+    """
+    label = f"{data_curta(de)} a {data_curta(ate)}"
+    pdf = DirceuPDF(config, "Serviços avulsos - período", label, rodape_id=f"Serviços {label}")
+
+    pdf.set_font("helvetica", "", 8.5)
+    pdf.set_text_color(*SLATE)
+    pdf.multi_cell(CONTENT_W, 4.5, L(
+        "Só serviços avulsos (não inclui máquinas). O resultado consolidado soma os "
+        "serviços FINALIZADOS no período (por data de finalização)."
+    ))
+    pdf.set_text_color(*INK)
+    pdf.ln(1)
+
+    def _bloco(b, incluir_diario=True):
+        s, ag = b["servico"], b["ag"]
+        pdf.quebra_se_preciso(24)
+        pdf.ln(1)
+        pdf._losango(MARGIN + 1.5, pdf.get_y() + 3, 1.5)
+        pdf.set_xy(MARGIN + 6, pdf.get_y())
+        pdf.set_font("helvetica", "B", 11)
+        pdf.cell(110, 6, L(s.descricao[:52]))
+        pdf.set_font("helvetica", "", 8)
+        pdf.set_text_color(*SLATE)
+        pdf.cell(0, 6, L((s.cliente or "-") + " . " + {"aberto": "Aberto", "finalizado": "Finalizado", "fechado": "Fechado"}.get(s.status, s.status)),
+                 align="R", new_x="LMARGIN", new_y="NEXT")
+        pdf.set_text_color(*INK)
+        pdf.set_font("courier", "B", 9)
+        pdf.set_x(MARGIN + 6)
+        cor = IN_GREEN if b["resultado"] >= 0 else POCKET_RED
+        pdf.write(5.5, L(
+            f"valor R$ {moeda(s.valor)}  .  seu custo R$ {moeda(ag.custo_dirceu)}"
+            f"  .  {horas_fmt(ag.horas)}h  .  resultado "
+        ))
+        pdf.set_text_color(*cor)
+        pdf.write(5.5, L(f"R$ {moeda(b['resultado'])}"))
+        pdf.set_text_color(*INK)
+        pdf.ln(6)
+        if ag.custo_epr > 0:
+            pdf.set_font("helvetica", "", 7.5)
+            pdf.set_text_color(*SLATE)
+            pdf.set_x(MARGIN + 6)
+            pdf.cell(0, 4.5, L(f"EPR pagou R$ {moeda(ag.custo_epr)} (fora do resultado)"),
+                     new_x="LMARGIN", new_y="NEXT")
+            pdf.set_text_color(*INK)
+        if incluir_diario:
+            for e in b["entradas"]:
+                pdf.quebra_se_preciso(6)
+                y = pdf.get_y()
+                pdf.set_font("courier", "", 8)
+                pdf.set_xy(MARGIN + 6, y)
+                pdf.cell(22, 4.8, L(data_br(e.data)))
+                pdf.set_font("helvetica", "", 8)
+                pdf.set_xy(MARGIN + 28, y)
+                desc = e.descricao if len(e.descricao) <= 78 else e.descricao[:78] + "..."
+                pdf.cell(126, 4.8, L(desc))
+                pdf.set_font("courier", "", 8)
+                horas_dia = sum((Decimal(str(t.horas)) for t in e.trabalhos), Decimal("0"))
+                pdf.set_xy(PAGE_W - MARGIN - 22, y)
+                pdf.cell(22, 4.8, L(f"{horas_fmt(horas_dia)}h"), align="R")
+                pdf.set_y(y + 5)
+            if b["mais_n"] > 0:
+                pdf.set_font("helvetica", "I", 7.5)
+                pdf.set_text_color(*SLATE2)
+                pdf.set_x(MARGIN + 6)
+                pdf.cell(0, 4.5, L(f"... e mais {b['mais_n']} lançamento(s)"), new_x="LMARGIN", new_y="NEXT")
+                pdf.set_text_color(*INK)
+        pdf.ln(1.5)
+        _linha_fina(pdf)
+
+    _sec(pdf, "Serviços finalizados no período")
+    if not finalizados:
+        _nada(pdf, "Nenhum serviço avulso finalizado no período.")
+    for b in finalizados:
+        _bloco(b)
+
+    if andamento:
+        _sec(pdf, "Em andamento com atividade no período (informativo)")
+        for b in andamento:
+            _bloco(b, incluir_diario=False)
+
+    # ---- resumo dos FINALIZADOS ----
+    _sec(pdf, "Resumo dos finalizados")
+    cols = [("Serviço", 74, "L"), ("Valor", 34, "R"), ("Seu custo", 36, "R"), ("Resultado", 38, "R")]
+    _tab_header(pdf, cols)
+    for b in finalizados:
+        pdf.quebra_se_preciso(7)
+        y = pdf.get_y()
+        s, ag = b["servico"], b["ag"]
+        pdf.set_font("helvetica", "B", 8)
+        pdf.set_xy(MARGIN, y)
+        pdf.cell(74, 5.5, L(s.descricao[:44]))
+        pdf.set_font("courier", "", 8.5)
+        pdf.set_xy(MARGIN + 74, y); pdf.cell(34, 5.5, L(f"R$ {moeda(s.valor)}"), align="R")
+        pdf.set_xy(MARGIN + 108, y); pdf.cell(36, 5.5, L(f"R$ {moeda(ag.custo_dirceu)}"), align="R")
+        pdf.set_text_color(*(IN_GREEN if b["resultado"] >= 0 else POCKET_RED))
+        pdf.set_xy(MARGIN + 144, y); pdf.cell(38, 5.5, L(f"R$ {moeda(b['resultado'])}"), align="R")
+        pdf.set_text_color(*INK)
+        pdf.set_y(y + 6)
+        _linha_fina(pdf)
+
+    cor = IN_GREEN if totais["resultado"] >= 0 else POCKET_RED
+    _total_box(pdf, "Resultado dos serviços no período", f"R$ {moeda(totais['resultado'])}", cor=cor)
+    pdf.set_font("helvetica", "", 8.5)
+    pdf.set_text_color(*SLATE)
+    pdf.cell(0, 5, L(
+        f"Recebido R$ {moeda(totais['valor'])} - seu custo R$ {moeda(totais['custo_dirceu'])}"
+        f" = resultado R$ {moeda(totais['resultado'])} . {horas_fmt(totais['horas'])}h"
+    ), new_x="LMARGIN", new_y="NEXT")
+    pdf.set_text_color(*INK)
+    return pdf

@@ -115,7 +115,9 @@ Sistema de gestão para o **Dirceu**, prestador PJ de caldeiraria e solda que ge
 - `GET /fechamentos/previa?de=&ate=` (calcula sem gravar: máquinas finalizadas no período + adiantamentos abertos vinculados + saldo)
 - `POST /fechamentos` (registra o acerto: efetiva status/quitações, gera número, cria recebimento tipo fechamento) · `GET /fechamentos` (histórico)
 - `GET /dashboard` (KPIs, horas por dia da semana, margens, avisos, texto do resumo WhatsApp)
-- PDFs: `GET /pdf/maquina/{id}`, `GET /pdf/servico/{id}`, `GET /pdf/maquinas?status=`, `GET /pdf/periodo?de=&ate=` (máquinas + serviços), `GET /pdf/ajudantes?de=&ate=[&ajudante_id=]`, `GET /pdf/entradas?de=&ate=`, `GET /pdf/resultado?de=&ate=` (ganho real do período), `GET /pdf/fechamento/{id}` (com seção de serviços; e `GET /pdf/fechamento-previa?de=&ate=`)
+- PDFs: `GET /pdf/maquina/{id}`, `GET /pdf/servico/{id}`, `GET /pdf/maquinas?status=`, `GET /pdf/servicos-periodo?de=&ate=` (consolidado dos serviços avulsos finalizados no período; só serviços, sem máquinas), `GET /pdf/periodo?de=&ate=` (máquinas + serviços), `GET /pdf/ajudantes?de=&ate=[&ajudante_id=]`, `GET /pdf/entradas?de=&ate=`, `GET /pdf/resultado?de=&ate=` (ganho real do período), `GET /pdf/fechamento/{id}` (com seção de serviços; e `GET /pdf/fechamento-previa?de=&ate=`)
+
+**Navegação (frontend):** itens próprios na sidebar/tabbar — Início, Máquinas, **Serviços** (avulsos), Financeiro, Fechamento, Relatórios. O FAB "Lançar dia" aparece SÓ no detalhe de uma máquina ou serviço (onde há contexto), nunca nas listas nem em outras telas.
 
 ---
 
