@@ -20,7 +20,8 @@ Sistema de gestão para o **Dirceu**, prestador PJ de caldeiraria e solda que ge
   - `bolso` — "Do bolso": o Dirceu paga com dinheiro próprio. Entra no acerto dele com a EPR.
 - **Caixa de repasse**: (verbas de repasse recebidas da EPR) − (pagamentos com origem `repasse`). Mostra quanto sobra/falta na mão do Dirceu.
 - **Recebimentos do Dirceu**: `adiantamento` (recebe antes de terminar; fica **em aberto** até ser abatido) e `fechamento` (o acerto).
-- **Fechamento por período**: escolhe De/Até → entram as máquinas **finalizadas** no período (empreita integral) − adiantamentos **em aberto** vinculados → **SALDO A RECEBER**. Ao "registrar o acerto": máquinas viram `fechada`, adiantamentos viram `quitado`, e nasce um recebimento tipo `fechamento` com o valor do saldo. Sem data fixa — adiantamentos ficam em aberto por quanto tempo for preciso.
+- **Fechamento por período**: escolhe De/Até → entram as máquinas **finalizadas** (empreita integral) E os **serviços avulsos finalizados** (valor integral) no período − adiantamentos **em aberto** vinculados → **SALDO A RECEBER**. Ao "registrar o acerto": máquinas viram `fechada`, serviços viram `fechado`, adiantamentos viram `quitado`, e nasce um recebimento tipo `fechamento` com o valor do saldo. Sem data fixa — adiantamentos ficam em aberto por quanto tempo for preciso.
+- **Serviço avulso**: trabalho pontual (peça, reparo, bico) que não é empreita de máquina, mas que o Dirceu também recebe e que TAMBÉM entra no fechamento. Tem diário próprio (mesmas 3 origens + "eu trabalhei"), custo do Dirceu = bolso + despesas, resultado = valor − custo. Entra no dashboard (horas/pago/a receber/avisos), nos totais, no resultado e nos PDFs, ao lado das máquinas.
 
 ---
 
@@ -79,9 +80,15 @@ Sistema de gestão para o **Dirceu**, prestador PJ de caldeiraria e solda que ge
 
 **diario_trabalhos** — id, entrada_id (FK CASCADE), ajudante_id (FK SET NULL), ajudante_nome (snapshot), horas (num), valor (num), origem (`repasse`/`epr_direto`/`bolso`/`proprio`), proprio (bool, default false — "eu trabalhei": horas do Dirceu, valor 0, remuneração é a empreita; conta nas horas, não nos custos/pagamentos)
 
-**despesas** — id, data (date), valor (num), categoria (`deslocamento`/`alimentacao`/`material`/`outros`), descricao (opc), maquina_id (FK SET NULL, opc), maquina_nome (snapshot, opc) — gastos do próprio Dirceu; entram no "resultado do período"
+**servicos** — id, descricao (texto), cliente (texto livre, opc), valor (num — combinado que o Dirceu recebe), status (`aberto`/`finalizado`/`fechado`, default `aberto`), data_inicio (date), data_finalizacao (date, null), obs (opc), fechamento_id (FK SET NULL, null). IRMÃO de máquina: trabalho pontual (peça/reparo/bico) que NÃO é empreita, mas que o Dirceu recebe e TAMBÉM entra no fechamento (valor integral). Diário próprio (servico_entradas/servico_trabalhos, iguais aos da máquina, com origem e proprio). custo_dirceu = bolso + despesas vinculadas; resultado = valor − custo_dirceu. Exclusão igual à de máquina (não-fechado exclui com desvínculo; fechado bloqueia).
 
-**recebimentos** — id, tipo (`adiantamento`/`fechamento`), data (date), valor (num), maquina_id (FK SET NULL, opc), maquina_nome (snapshot, opc), status (`aberto`/`quitado` — só relevante p/ adiantamento; fechamento nasce `quitado`), fechamento_id (FK null, SET NULL), obs (opc)
+**servico_entradas** — id, servico_id (FK CASCADE), data (date), descricao (texto)
+
+**servico_trabalhos** — id, entrada_id (FK CASCADE), ajudante_id (FK SET NULL), ajudante_nome (snapshot), horas, valor, origem, proprio (bool)
+
+**despesas** — id, data (date), valor (num), categoria (`deslocamento`/`alimentacao`/`material`/`outros`), descricao (opc), maquina_id (FK SET NULL, opc), maquina_nome (snapshot, opc), servico_id (FK SET NULL, opc), servico_nome (snapshot, opc) — gastos do próprio Dirceu; entram no "resultado do período". Vínculo EXCLUDENTE: máquina OU serviço, nunca ambos.
+
+**recebimentos** — id, tipo (`adiantamento`/`fechamento`), data (date), valor (num), maquina_id (FK SET NULL, opc), maquina_nome (snapshot, opc), servico_id (FK SET NULL, opc), servico_nome (snapshot, opc), status (`aberto`/`quitado` — só relevante p/ adiantamento; fechamento nasce `quitado`), fechamento_id (FK null, SET NULL), obs (opc). Vínculo EXCLUDENTE: máquina OU serviço.
 
 **repasse_entradas** — id, data (date), valor (num), obs (opc) — verbas que a EPR mandou pro Dirceu repassar
 
@@ -98,6 +105,7 @@ Sistema de gestão para o **Dirceu**, prestador PJ de caldeiraria e solda que ge
 - `GET/POST/PUT/DELETE /ajudantes` (lista com filtro `ativo`, e `?q=`)
 - `GET/POST/PUT/DELETE /maquinas` (lista com `?status=&q=`; GET /{id} traz diário completo + custos/horas/margem calculados)
 - `POST/PUT/DELETE /maquinas/{id}/diario` (entrada com lista de trabalhos aninhada; PUT substitui os trabalhos da entrada)
+- `GET/POST/PUT/DELETE /servicos` (irmão de máquina; lista com `?status=&q=`; GET /{id} com diário + custo/resultado/horas) e `POST/PUT/DELETE /servicos/{id}/diario`
 - `GET/POST/PUT/DELETE /recebimentos` (filtros `?tipo=&status=&de=&ate=`)
 - `GET/POST/PUT/DELETE /repasses` (verbas de repasse)
 - `GET/POST/PUT/DELETE /despesas` (filtros `?de=&ate=&categoria=&maquina_id=`)
@@ -107,7 +115,7 @@ Sistema de gestão para o **Dirceu**, prestador PJ de caldeiraria e solda que ge
 - `GET /fechamentos/previa?de=&ate=` (calcula sem gravar: máquinas finalizadas no período + adiantamentos abertos vinculados + saldo)
 - `POST /fechamentos` (registra o acerto: efetiva status/quitações, gera número, cria recebimento tipo fechamento) · `GET /fechamentos` (histórico)
 - `GET /dashboard` (KPIs, horas por dia da semana, margens, avisos, texto do resumo WhatsApp)
-- PDFs: `GET /pdf/maquina/{id}`, `GET /pdf/periodo?de=&ate=`, `GET /pdf/ajudantes?de=&ate=[&ajudante_id=]`, `GET /pdf/entradas?de=&ate=`, `GET /pdf/resultado?de=&ate=` (ganho real do período), `GET /pdf/fechamento/{id}` (e `GET /pdf/fechamento-previa?de=&ate=`)
+- PDFs: `GET /pdf/maquina/{id}`, `GET /pdf/servico/{id}`, `GET /pdf/maquinas?status=`, `GET /pdf/periodo?de=&ate=` (máquinas + serviços), `GET /pdf/ajudantes?de=&ate=[&ajudante_id=]`, `GET /pdf/entradas?de=&ate=`, `GET /pdf/resultado?de=&ate=` (ganho real do período), `GET /pdf/fechamento/{id}` (com seção de serviços; e `GET /pdf/fechamento-previa?de=&ate=`)
 
 ---
 
