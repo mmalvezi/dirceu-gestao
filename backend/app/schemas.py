@@ -220,6 +220,7 @@ class RecebimentoCreate(BaseModel):
     data: date
     valor: float
     maquina_id: int | None = None
+    servico_id: int | None = None
     obs: str | None = None
 
 
@@ -227,6 +228,7 @@ class RecebimentoUpdate(BaseModel):
     data: date | None = None
     valor: float | None = None
     maquina_id: int | None = None
+    servico_id: int | None = None
     obs: str | None = None
 
 
@@ -239,6 +241,8 @@ class RecebimentoOut(BaseModel):
     valor: float
     maquina_id: int | None
     maquina_nome: str | None
+    servico_id: int | None
+    servico_nome: str | None
     status: str
     fechamento_id: int | None
     obs: str | None
@@ -290,6 +294,7 @@ class DespesaCreate(BaseModel):
     categoria: str  # deslocamento/alimentacao/material/outros
     descricao: str | None = None
     maquina_id: int | None = None
+    servico_id: int | None = None
 
 
 class DespesaUpdate(BaseModel):
@@ -298,6 +303,7 @@ class DespesaUpdate(BaseModel):
     categoria: str | None = None
     descricao: str | None = None
     maquina_id: int | None = None
+    servico_id: int | None = None
 
 
 class DespesaOut(BaseModel):
@@ -310,6 +316,8 @@ class DespesaOut(BaseModel):
     descricao: str | None
     maquina_id: int | None
     maquina_nome: str | None
+    servico_id: int | None
+    servico_nome: str | None
 
 
 # ----- Resultado do período (ganho real) -----

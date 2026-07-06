@@ -6,9 +6,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Maquina, Recebimento
+from app.models import Recebimento
 from app.schemas import RecebimentoCreate, RecebimentoOut, RecebimentoUpdate
 from app.security import get_current_user
+from app.vinculo import resolver_vinculo
 
 router = APIRouter(
     prefix="/recebimentos",
@@ -33,13 +34,6 @@ def _exigir_editavel(receb: Recebimento) -> None:
         )
 
 
-def _snapshot_maquina(db: Session, maquina_id: int) -> str:
-    maquina = db.get(Maquina, maquina_id)
-    if maquina is None:
-        raise HTTPException(status_code=404, detail="Máquina não encontrada")
-    return maquina.nome
-
-
 @router.get("", response_model=list[RecebimentoOut])
 def listar(
     tipo: str | None = None,
@@ -47,6 +41,7 @@ def listar(
     de: date | None = None,
     ate: date | None = None,
     maquina_id: int | None = None,
+    servico_id: int | None = None,
     db: Session = Depends(get_db),
 ) -> list[Recebimento]:
     query = db.query(Recebimento)
@@ -60,6 +55,8 @@ def listar(
         query = query.filter(Recebimento.data <= ate)
     if maquina_id is not None:
         query = query.filter(Recebimento.maquina_id == maquina_id)
+    if servico_id is not None:
+        query = query.filter(Recebimento.servico_id == servico_id)
     return query.order_by(Recebimento.data.desc(), Recebimento.id.desc()).all()
 
 
@@ -73,16 +70,17 @@ def criar(payload: RecebimentoCreate, db: Session = Depends(get_db)) -> Recebime
     if payload.valor <= 0:
         raise HTTPException(status_code=422, detail="Valor deve ser maior que zero")
 
-    maquina_nome = None
-    if payload.maquina_id is not None:
-        maquina_nome = _snapshot_maquina(db, payload.maquina_id)
-
+    maq_id, maq_nome, srv_id, srv_nome = resolver_vinculo(
+        db, payload.maquina_id, payload.servico_id
+    )
     receb = Recebimento(
         tipo="adiantamento",
         data=payload.data,
         valor=payload.valor,
-        maquina_id=payload.maquina_id,
-        maquina_nome=maquina_nome,
+        maquina_id=maq_id,
+        maquina_nome=maq_nome,
+        servico_id=srv_id,
+        servico_nome=srv_nome,
         status="aberto",
         obs=payload.obs,
     )
@@ -108,13 +106,17 @@ def atualizar(
         receb.data = data["data"]
     if "obs" in data:
         receb.obs = data["obs"]
-    if "maquina_id" in data:
-        if data["maquina_id"] is None:
-            receb.maquina_id = None
-            receb.maquina_nome = None
+    # Vínculo (excludente): enviar SÓ um dos dois limpa o outro.
+    if "maquina_id" in data or "servico_id" in data:
+        if "maquina_id" in data and "servico_id" in data:
+            novo_maq, novo_srv = data["maquina_id"], data["servico_id"]
+        elif "maquina_id" in data:
+            novo_maq, novo_srv = data["maquina_id"], None
         else:
-            receb.maquina_nome = _snapshot_maquina(db, data["maquina_id"])
-            receb.maquina_id = data["maquina_id"]
+            novo_maq, novo_srv = None, data["servico_id"]
+        maq_id, maq_nome, srv_id, srv_nome = resolver_vinculo(db, novo_maq, novo_srv)
+        receb.maquina_id, receb.maquina_nome = maq_id, maq_nome
+        receb.servico_id, receb.servico_nome = srv_id, srv_nome
 
     db.commit()
     db.refresh(receb)

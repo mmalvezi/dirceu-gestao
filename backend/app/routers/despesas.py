@@ -6,9 +6,10 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Despesa, Maquina
+from app.models import Despesa
 from app.schemas import DespesaCreate, DespesaOut, DespesaUpdate
 from app.security import get_current_user
+from app.vinculo import resolver_vinculo
 
 router = APIRouter(
     prefix="/despesas",
@@ -31,19 +32,13 @@ def _validar_categoria(categoria: str) -> None:
         raise HTTPException(status_code=422, detail="Categoria inválida")
 
 
-def _snapshot_maquina(db: Session, maquina_id: int) -> str:
-    maquina = db.get(Maquina, maquina_id)
-    if maquina is None:
-        raise HTTPException(status_code=404, detail="Máquina não encontrada")
-    return maquina.nome
-
-
 @router.get("", response_model=list[DespesaOut])
 def listar(
     de: date | None = None,
     ate: date | None = None,
     categoria: str | None = None,
     maquina_id: int | None = None,
+    servico_id: int | None = None,
     db: Session = Depends(get_db),
 ) -> list[Despesa]:
     query = db.query(Despesa)
@@ -55,6 +50,8 @@ def listar(
         query = query.filter(Despesa.categoria == categoria)
     if maquina_id is not None:
         query = query.filter(Despesa.maquina_id == maquina_id)
+    if servico_id is not None:
+        query = query.filter(Despesa.servico_id == servico_id)
     return query.order_by(Despesa.data.desc(), Despesa.id.desc()).all()
 
 
@@ -63,16 +60,18 @@ def criar(payload: DespesaCreate, db: Session = Depends(get_db)) -> Despesa:
     if payload.valor <= 0:
         raise HTTPException(status_code=422, detail="Valor deve ser maior que zero")
     _validar_categoria(payload.categoria)
-    maquina_nome = None
-    if payload.maquina_id is not None:
-        maquina_nome = _snapshot_maquina(db, payload.maquina_id)
+    maq_id, maq_nome, srv_id, srv_nome = resolver_vinculo(
+        db, payload.maquina_id, payload.servico_id
+    )
     despesa = Despesa(
         data=payload.data,
         valor=payload.valor,
         categoria=payload.categoria,
         descricao=payload.descricao,
-        maquina_id=payload.maquina_id,
-        maquina_nome=maquina_nome,
+        maquina_id=maq_id,
+        maquina_nome=maq_nome,
+        servico_id=srv_id,
+        servico_nome=srv_nome,
     )
     db.add(despesa)
     db.commit()
@@ -97,13 +96,17 @@ def atualizar(
         despesa.data = dados["data"]
     if "descricao" in dados:
         despesa.descricao = dados["descricao"]
-    if "maquina_id" in dados:
-        if dados["maquina_id"] is None:
-            despesa.maquina_id = None
-            despesa.maquina_nome = None
+    # Vínculo (excludente): enviar SÓ um dos dois limpa o outro; ambos → resolver valida.
+    if "maquina_id" in dados or "servico_id" in dados:
+        if "maquina_id" in dados and "servico_id" in dados:
+            novo_maq, novo_srv = dados["maquina_id"], dados["servico_id"]
+        elif "maquina_id" in dados:
+            novo_maq, novo_srv = dados["maquina_id"], None
         else:
-            despesa.maquina_nome = _snapshot_maquina(db, dados["maquina_id"])
-            despesa.maquina_id = dados["maquina_id"]
+            novo_maq, novo_srv = None, dados["servico_id"]
+        maq_id, maq_nome, srv_id, srv_nome = resolver_vinculo(db, novo_maq, novo_srv)
+        despesa.maquina_id, despesa.maquina_nome = maq_id, maq_nome
+        despesa.servico_id, despesa.servico_nome = srv_id, srv_nome
     db.commit()
     db.refresh(despesa)
     return despesa
