@@ -123,6 +123,72 @@ class DiarioTrabalho(Base):
     entrada: Mapped["DiarioEntrada"] = relationship(back_populates="trabalhos")
 
 
+class Servico(Base):
+    """Serviço avulso: trabalho pontual (peça, reparo, bico) que não é empreita de
+    máquina, mas que o Dirceu recebe e TAMBÉM entra no fechamento. Irmão de Maquina."""
+
+    __tablename__ = "servicos"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    descricao: Mapped[str] = mapped_column(Text)
+    cliente: Mapped[str | None] = mapped_column(String, nullable=True)  # texto livre, opc
+    valor: Mapped[Decimal] = mapped_column(Numeric(10, 2))  # combinado que o Dirceu recebe
+    status: Mapped[str] = mapped_column(String, default="aberto")  # aberto/finalizado/fechado
+    data_inicio: Mapped[date] = mapped_column(Date)
+    data_finalizacao: Mapped[date | None] = mapped_column(Date, nullable=True)
+    obs: Mapped[str | None] = mapped_column(Text, nullable=True)
+    fechamento_id: Mapped[int | None] = mapped_column(
+        ForeignKey("fechamentos.id", ondelete="SET NULL"), nullable=True
+    )
+
+    diario: Mapped[list["ServicoEntrada"]] = relationship(
+        back_populates="servico",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
+    __table_args__ = (Index("ix_servicos_status", "status"),)
+
+
+class ServicoEntrada(Base):
+    __tablename__ = "servico_entradas"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    servico_id: Mapped[int] = mapped_column(
+        ForeignKey("servicos.id", ondelete="CASCADE")
+    )
+    data: Mapped[date] = mapped_column(Date)
+    descricao: Mapped[str] = mapped_column(Text)
+
+    servico: Mapped["Servico"] = relationship(back_populates="diario")
+    trabalhos: Mapped[list["ServicoTrabalho"]] = relationship(
+        back_populates="entrada",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
+    __table_args__ = (Index("ix_servico_entradas_servico_id_data", "servico_id", "data"),)
+
+
+class ServicoTrabalho(Base):
+    __tablename__ = "servico_trabalhos"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    entrada_id: Mapped[int] = mapped_column(
+        ForeignKey("servico_entradas.id", ondelete="CASCADE")
+    )
+    ajudante_id: Mapped[int | None] = mapped_column(
+        ForeignKey("ajudantes.id", ondelete="SET NULL"), nullable=True
+    )
+    ajudante_nome: Mapped[str] = mapped_column(String)  # snapshot
+    horas: Mapped[Decimal] = mapped_column(Numeric(5, 1))
+    valor: Mapped[Decimal] = mapped_column(Numeric(10, 2))
+    origem: Mapped[str] = mapped_column(String)  # repasse/epr_direto/bolso/proprio
+    proprio: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+
+    entrada: Mapped["ServicoEntrada"] = relationship(back_populates="trabalhos")
+
+
 class Recebimento(Base):
     __tablename__ = "recebimentos"
 
@@ -134,6 +200,11 @@ class Recebimento(Base):
         ForeignKey("maquinas.id", ondelete="SET NULL"), nullable=True
     )
     maquina_nome: Mapped[str | None] = mapped_column(String, nullable=True)  # snapshot
+    # Vínculo opcional a serviço (excludente com máquina — validado na aplicação).
+    servico_id: Mapped[int | None] = mapped_column(
+        ForeignKey("servicos.id", ondelete="SET NULL"), nullable=True
+    )
+    servico_nome: Mapped[str | None] = mapped_column(String, nullable=True)  # snapshot
     status: Mapped[str] = mapped_column(String, default="aberto")  # aberto/quitado
     fechamento_id: Mapped[int | None] = mapped_column(
         ForeignKey("fechamentos.id", ondelete="SET NULL"), nullable=True
@@ -157,6 +228,11 @@ class Despesa(Base):
         ForeignKey("maquinas.id", ondelete="SET NULL"), nullable=True
     )
     maquina_nome: Mapped[str | None] = mapped_column(String, nullable=True)  # snapshot
+    # Vínculo opcional a serviço (excludente com máquina — validado na aplicação).
+    servico_id: Mapped[int | None] = mapped_column(
+        ForeignKey("servicos.id", ondelete="SET NULL"), nullable=True
+    )
+    servico_nome: Mapped[str | None] = mapped_column(String, nullable=True)  # snapshot
 
 
 class RepasseEntrada(Base):
