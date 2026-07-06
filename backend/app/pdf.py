@@ -561,7 +561,9 @@ def pdf_entradas(config, de, ate, recebimentos, total_receb, repasses, total_rep
 # ==================== 5) Fechamento (e prévia) ====================
 
 def pdf_fechamento(config, numero, sub, maquinas, adiantamentos,
-                   total_devido, total_adiantado, saldo, obs, previa=False) -> DirceuPDF:
+                   total_devido, total_adiantado, saldo, obs, previa=False,
+                   servicos=None) -> DirceuPDF:
+    servicos = servicos or []
     pdf = DirceuPDF(config, "Fechamento", sub, rodape_id=numero)
 
     if previa:
@@ -597,6 +599,33 @@ def pdf_fechamento(config, numero, sub, maquinas, adiantamentos,
         pdf.cell(36, 5.5, L(f"R$ {moeda(m.empreita)}"), align="R")
         pdf.set_y(y + 6)
         _linha_fina(pdf)
+    if not maquinas:
+        _nada(pdf, "Nenhuma máquina finalizada no período.")
+
+    # ---- Bloco 1b: serviços avulsos finalizados ----
+    if servicos:
+        _sec(pdf, "Serviços avulsos finalizados")
+        cols_s = [("Serviço", 66, "L"), ("Cliente", 50, "L"), ("Finalizado em", 30, "L"), ("Valor", 36, "R")]
+        _tab_header(pdf, cols_s)
+        for s in servicos:
+            pdf.quebra_se_preciso(7)
+            y = pdf.get_y()
+            pdf.set_font("helvetica", "B", 8.5)
+            pdf.set_xy(MARGIN, y)
+            pdf.cell(66, 5.5, L(s.descricao[:40]))
+            pdf.set_font("helvetica", "", 8.5)
+            pdf.set_xy(MARGIN + 66, y)
+            pdf.cell(50, 5.5, L(s.cliente or "-"))
+            pdf.set_font("courier", "", 8.5)
+            pdf.set_xy(MARGIN + 116, y)
+            pdf.cell(30, 5.5, L(data_br(s.data_finalizacao) if s.data_finalizacao else "-"))
+            pdf.set_font("courier", "", 9)
+            pdf.set_xy(MARGIN + 146, y)
+            pdf.cell(36, 5.5, L(f"R$ {moeda(s.valor)}"), align="R")
+            pdf.set_y(y + 6)
+            _linha_fina(pdf)
+
+    # ---- Total devido (máquinas + serviços) ----
     y = pdf.get_y()
     pdf.set_font("helvetica", "B", 8)
     pdf.set_xy(MARGIN, y)
@@ -621,7 +650,8 @@ def pdf_fechamento(config, numero, sub, maquinas, adiantamentos,
             pdf.cell(28, 5.5, L(data_br(a.data)))
             pdf.set_font("helvetica", "", 8.5)
             pdf.set_xy(MARGIN + 28, y)
-            pdf.cell(96, 5.5, L(a.maquina_nome or "- (sem vínculo)"))
+            vinculo = a.maquina_nome or a.servico_nome or "- (sem vínculo)"
+            pdf.cell(96, 5.5, L(vinculo))
             pdf.set_font("courier", "", 9)
             pdf.set_text_color(*WARN)
             pdf.set_xy(MARGIN + 124, y)

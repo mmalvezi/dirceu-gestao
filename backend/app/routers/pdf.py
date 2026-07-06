@@ -18,6 +18,7 @@ from app.models import (
     Maquina,
     Recebimento,
     RepasseEntrada,
+    Servico,
 )
 from app.pdf import (
     pdf_ajudantes,
@@ -301,13 +302,14 @@ def rel_resultado(de: date, ate: date, db: Session = Depends(get_db)) -> Respons
 @router.get("/fechamento-previa")
 def rel_fechamento_previa(de: date, ate: date, db: Session = Depends(get_db)) -> Response:
     _periodo_ok(de, ate)
-    maquinas, adiantamentos, devido, adiantado, saldo = _calcular_previa(db, de, ate)
+    maquinas, servicos, adiantamentos, devido, adiantado, saldo = _calcular_previa(db, de, ate)
     label = f"{data_curta(de)} a {data_curta(ate)}"
     pdf = pdf_fechamento(
         get_config(db),
         numero="PRÉVIA",
         sub=f"Prévia . período {label}",
         maquinas=maquinas,
+        servicos=servicos,
         adiantamentos=adiantamentos,
         total_devido=devido,
         total_adiantado=adiantado,
@@ -329,6 +331,12 @@ def rel_fechamento(fechamento_id: int, db: Session = Depends(get_db)) -> Respons
         .order_by(Maquina.data_finalizacao, Maquina.id)
         .all()
     )
+    servicos = (
+        db.query(Servico)
+        .filter(Servico.fechamento_id == fech.id)
+        .order_by(Servico.data_finalizacao, Servico.id)
+        .all()
+    )
     adiantamentos = (
         db.query(Recebimento)
         .filter(Recebimento.fechamento_id == fech.id, Recebimento.tipo == "adiantamento")
@@ -341,6 +349,7 @@ def rel_fechamento(fechamento_id: int, db: Session = Depends(get_db)) -> Respons
         numero=fech.numero,
         sub=f"{fech.numero} . período {label}",
         maquinas=maquinas,
+        servicos=servicos,
         adiantamentos=adiantamentos,
         total_devido=_dec(fech.total_devido),
         total_adiantado=_dec(fech.total_adiantado),

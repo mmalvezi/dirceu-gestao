@@ -21,7 +21,7 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Fechamento, Maquina, Recebimento
+from app.models import Fechamento, Maquina, Recebimento, Servico
 from app.routers.config import get_config
 from app.schemas import (
     FechamentoCreate,
@@ -47,8 +47,11 @@ def _validar_periodo(de: date, ate: date) -> None:
 
 def _calcular_previa(
     db: Session, de: date, ate: date
-) -> tuple[list[Maquina], list[Recebimento], Decimal, Decimal, Decimal]:
-    """Núcleo compartilhado entre a prévia e o registro (nunca confiar no cliente)."""
+) -> tuple[list[Maquina], list[Servico], list[Recebimento], Decimal, Decimal, Decimal]:
+    """Núcleo compartilhado entre a prévia e o registro (nunca confiar no cliente).
+
+    Entram máquinas FINALIZADAS (empreita) e serviços FINALIZADOS (valor) no período.
+    """
     maquinas = (
         db.query(Maquina)
         .filter(
@@ -59,32 +62,53 @@ def _calcular_previa(
         .order_by(Maquina.data_finalizacao, Maquina.id)
         .all()
     )
+    servicos = (
+        db.query(Servico)
+        .filter(
+            Servico.status == "finalizado",
+            Servico.data_finalizacao >= de,
+            Servico.data_finalizacao <= ate,
+        )
+        .order_by(Servico.data_finalizacao, Servico.id)
+        .all()
+    )
 
-    if not maquinas:
-        # Sem máquinas no período: prévia vazia (não abate adiantamentos flutuantes).
-        return [], [], Decimal("0"), Decimal("0"), Decimal("0")
+    if not maquinas and not servicos:
+        # Nada no período: prévia vazia (não abate adiantamentos flutuantes).
+        return [], [], [], Decimal("0"), Decimal("0"), Decimal("0")
 
     mids = [m.id for m in maquinas]
+    sids = [s.id for s in servicos]
     adiantamentos = (
         db.query(Recebimento)
         .filter(
             Recebimento.tipo == "adiantamento",
             Recebimento.status == "aberto",
-            or_(Recebimento.maquina_id.in_(mids), Recebimento.maquina_id.is_(None)),
+            or_(
+                Recebimento.maquina_id.in_(mids),
+                Recebimento.servico_id.in_(sids),
+                # flutuante: sem vínculo com máquina nem serviço
+                (Recebimento.maquina_id.is_(None) & Recebimento.servico_id.is_(None)),
+            ),
         )
         .order_by(Recebimento.data.desc(), Recebimento.id.desc())
         .all()
     )
 
-    total_devido = sum((Decimal(str(m.empreita)) for m in maquinas), Decimal("0"))
+    total_devido = sum(
+        (Decimal(str(m.empreita)) for m in maquinas), Decimal("0")
+    ) + sum((Decimal(str(s.valor)) for s in servicos), Decimal("0"))
     total_adiantado = sum((Decimal(str(a.valor)) for a in adiantamentos), Decimal("0"))
     saldo = total_devido - total_adiantado
-    return maquinas, adiantamentos, total_devido, total_adiantado, saldo
+    return maquinas, servicos, adiantamentos, total_devido, total_adiantado, saldo
 
 
 def _detalhe_out(db: Session, fechamento: Fechamento) -> FechamentoDetalheOut:
     maquinas = (
         db.query(Maquina).filter(Maquina.fechamento_id == fechamento.id).all()
+    )
+    servicos = (
+        db.query(Servico).filter(Servico.fechamento_id == fechamento.id).all()
     )
     adiantamentos = (
         db.query(Recebimento)
@@ -114,6 +138,7 @@ def _detalhe_out(db: Session, fechamento: Fechamento) -> FechamentoDetalheOut:
         saldo=float(fechamento.saldo),
         obs=fechamento.obs,
         maquinas=maquinas,
+        servicos=servicos,
         adiantamentos=adiantamentos,
         recebimento_fechamento=receb_fech,
     )
@@ -122,16 +147,17 @@ def _detalhe_out(db: Session, fechamento: Fechamento) -> FechamentoDetalheOut:
 @router.get("/previa", response_model=FechamentoPrevia)
 def previa(de: date, ate: date, db: Session = Depends(get_db)) -> FechamentoPrevia:
     _validar_periodo(de, ate)
-    maquinas, adiantamentos, devido, adiantado, saldo = _calcular_previa(db, de, ate)
+    maquinas, servicos, adiantamentos, devido, adiantado, saldo = _calcular_previa(db, de, ate)
     return FechamentoPrevia(
         periodo_de=de,
         periodo_ate=ate,
         maquinas=maquinas,
+        servicos=servicos,
         adiantamentos=adiantamentos,
         total_devido=float(devido),
         total_adiantado=float(adiantado),
         saldo=float(saldo),
-        pode_registrar=len(maquinas) >= 1,
+        pode_registrar=len(maquinas) + len(servicos) >= 1,
     )
 
 
@@ -143,10 +169,11 @@ def registrar(
     _validar_periodo(de, ate)
 
     # Recalcula SEMPRE no servidor — nunca confiar em números vindos do cliente.
-    maquinas, adiantamentos, devido, adiantado, saldo = _calcular_previa(db, de, ate)
-    if not maquinas:
+    maquinas, servicos, adiantamentos, devido, adiantado, saldo = _calcular_previa(db, de, ate)
+    if not maquinas and not servicos:
         raise HTTPException(
-            status_code=422, detail="Não há máquinas finalizadas no período."
+            status_code=422,
+            detail="Não há máquinas nem serviços finalizados no período.",
         )
 
     # ---- Transação única ----
@@ -168,6 +195,9 @@ def registrar(
     for m in maquinas:
         m.status = "fechada"
         m.fechamento_id = fechamento.id
+    for s in servicos:
+        s.status = "fechado"
+        s.fechamento_id = fechamento.id
     for a in adiantamentos:
         a.status = "quitado"
         a.fechamento_id = fechamento.id
@@ -199,6 +229,7 @@ def listar(db: Session = Depends(get_db)) -> list[FechamentoOut]:
     saida = []
     for f in fechamentos:
         maquinas = db.query(Maquina).filter(Maquina.fechamento_id == f.id).all()
+        servicos = db.query(Servico).filter(Servico.fechamento_id == f.id).all()
         saida.append(
             FechamentoOut(
                 id=f.id,
@@ -211,6 +242,7 @@ def listar(db: Session = Depends(get_db)) -> list[FechamentoOut]:
                 saldo=float(f.saldo),
                 obs=f.obs,
                 maquinas=maquinas,
+                servicos=servicos,
             )
         )
     return saida

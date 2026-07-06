@@ -357,6 +357,16 @@ class FechamentoMaquina(BaseModel):
     data_finalizacao: date | None
 
 
+class FechamentoServico(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    descricao: str
+    cliente: str | None
+    valor: float
+    data_finalizacao: date | None
+
+
 class FechamentoAdiantamento(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -365,12 +375,15 @@ class FechamentoAdiantamento(BaseModel):
     valor: float
     maquina_id: int | None
     maquina_nome: str | None
+    servico_id: int | None
+    servico_nome: str | None
 
 
 class FechamentoPrevia(BaseModel):
     periodo_de: date
     periodo_ate: date
     maquinas: list[FechamentoMaquina]
+    servicos: list[FechamentoServico]
     adiantamentos: list[FechamentoAdiantamento]
     total_devido: float
     total_adiantado: float
@@ -395,6 +408,7 @@ class FechamentoOut(BaseModel):
     saldo: float
     obs: str | None
     maquinas: list[FechamentoMaquina]
+    servicos: list[FechamentoServico] = []
 
 
 class FechamentoDetalheOut(FechamentoOut):
