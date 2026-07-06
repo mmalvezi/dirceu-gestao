@@ -8,6 +8,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import false, func
 from sqlalchemy.orm import Session
 
+from app.calc import (
+    bolso_periodo,
+    repasse_pago_total,
+    trabalhos_por_origem_periodo,
+)
 from app.database import get_db
 from app.models import (
     Despesa,
@@ -16,6 +21,9 @@ from app.models import (
     Maquina,
     Recebimento,
     RepasseEntrada,
+    Servico,
+    ServicoEntrada,
+    ServicoTrabalho,
 )
 from app.schemas import FinanceiroTotais, PagamentoOut, ResultadoOut
 from app.security import get_current_user
@@ -52,7 +60,10 @@ def pagamentos(
         de = de or d0
         ate = ate or a0
 
-    query = (
+    saida: list[PagamentoOut] = []
+
+    # Máquinas
+    q_maq = (
         db.query(DiarioTrabalho, DiarioEntrada.data, Maquina.id, Maquina.nome)
         .join(DiarioEntrada, DiarioTrabalho.entrada_id == DiarioEntrada.id)
         .join(Maquina, DiarioEntrada.maquina_id == Maquina.id)
@@ -63,24 +74,40 @@ def pagamentos(
         )
     )
     if ajudante_id is not None:
-        query = query.filter(DiarioTrabalho.ajudante_id == ajudante_id)
+        q_maq = q_maq.filter(DiarioTrabalho.ajudante_id == ajudante_id)
     if origem:
-        query = query.filter(DiarioTrabalho.origem == origem)
-    rows = query.order_by(DiarioEntrada.data.desc(), DiarioTrabalho.id.desc()).all()
+        q_maq = q_maq.filter(DiarioTrabalho.origem == origem)
+    for t, data, oid, onome in q_maq.all():
+        saida.append(PagamentoOut(
+            data=data, ajudante_id=t.ajudante_id, ajudante_nome=t.ajudante_nome,
+            origem_id=oid, origem_nome=onome, origem_tipo="maquina",
+            horas=float(t.horas), valor=float(t.valor), origem=t.origem,
+        ))
 
-    return [
-        PagamentoOut(
-            data=data,
-            ajudante_id=t.ajudante_id,
-            ajudante_nome=t.ajudante_nome,
-            maquina_id=mid,
-            maquina_nome=mnome,
-            horas=float(t.horas),
-            valor=float(t.valor),
-            origem=t.origem,
+    # Serviços avulsos
+    q_svc = (
+        db.query(ServicoTrabalho, ServicoEntrada.data, Servico.id, Servico.descricao)
+        .join(ServicoEntrada, ServicoTrabalho.entrada_id == ServicoEntrada.id)
+        .join(Servico, ServicoEntrada.servico_id == Servico.id)
+        .filter(
+            ServicoEntrada.data >= de,
+            ServicoEntrada.data <= ate,
+            ServicoTrabalho.proprio == false(),
         )
-        for t, data, mid, mnome in rows
-    ]
+    )
+    if ajudante_id is not None:
+        q_svc = q_svc.filter(ServicoTrabalho.ajudante_id == ajudante_id)
+    if origem:
+        q_svc = q_svc.filter(ServicoTrabalho.origem == origem)
+    for t, data, oid, onome in q_svc.all():
+        saida.append(PagamentoOut(
+            data=data, ajudante_id=t.ajudante_id, ajudante_nome=t.ajudante_nome,
+            origem_id=oid, origem_nome=onome, origem_tipo="servico",
+            horas=float(t.horas), valor=float(t.valor), origem=t.origem,
+        ))
+
+    saida.sort(key=lambda p: p.data, reverse=True)
+    return saida
 
 
 @router.get("/totais", response_model=FinanceiroTotais)
@@ -95,21 +122,11 @@ def totais(
         de = de or d0
         ate = ate or a0
 
-    # Trabalhos por origem no período (JOIN para filtrar pela DATA DA ENTRADA).
-    rows = (
-        db.query(
-            DiarioTrabalho.origem,
-            func.coalesce(func.sum(DiarioTrabalho.valor), 0),
-        )
-        .join(DiarioEntrada, DiarioTrabalho.entrada_id == DiarioEntrada.id)
-        .filter(DiarioEntrada.data >= de, DiarioEntrada.data <= ate)
-        .group_by(DiarioTrabalho.origem)
-        .all()
-    )
-    por_origem = {origem: _dec(valor) for origem, valor in rows}
-    repasse_pago = por_origem.get("repasse", Decimal("0"))
-    saido_bolso = por_origem.get("bolso", Decimal("0"))
-    pago_epr_direto = por_origem.get("epr_direto", Decimal("0"))
+    # Trabalhos por origem no período (máquinas + serviços).
+    por_origem = trabalhos_por_origem_periodo(db, de, ate)
+    repasse_pago = por_origem.get("repasse", (Decimal("0"),))[0]
+    saido_bolso = por_origem.get("bolso", (Decimal("0"),))[0]
+    pago_epr_direto = por_origem.get("epr_direto", (Decimal("0"),))[0]
     custo_total = repasse_pago + saido_bolso + pago_epr_direto
 
     # Verbas de repasse recebidas no período.
@@ -123,12 +140,7 @@ def totais(
     repasse_recebido_total = _dec(
         db.query(func.coalesce(func.sum(RepasseEntrada.valor), 0)).scalar()
     )
-    repasse_pago_total = _dec(
-        db.query(func.coalesce(func.sum(DiarioTrabalho.valor), 0))
-        .filter(DiarioTrabalho.origem == "repasse")
-        .scalar()
-    )
-    caixa_repasse = repasse_recebido_total - repasse_pago_total
+    caixa_repasse = repasse_recebido_total - repasse_pago_total(db)
 
     # Adiantamentos em aberto = posição atual (sem período).
     adiantado_aberto = _dec(
@@ -171,16 +183,7 @@ def resultado(de: date, ate: date, db: Session = Depends(get_db)) -> ResultadoOu
         .filter(Recebimento.data >= de, Recebimento.data <= ate)
         .scalar()
     )
-    total_bolso = _dec(
-        db.query(func.coalesce(func.sum(DiarioTrabalho.valor), 0))
-        .join(DiarioEntrada, DiarioTrabalho.entrada_id == DiarioEntrada.id)
-        .filter(
-            DiarioTrabalho.origem == "bolso",
-            DiarioEntrada.data >= de,
-            DiarioEntrada.data <= ate,
-        )
-        .scalar()
-    )
+    total_bolso = bolso_periodo(db, de, ate)  # máquinas + serviços
     total_despesas = _dec(
         db.query(func.coalesce(func.sum(Despesa.valor), 0))
         .filter(Despesa.data >= de, Despesa.data <= ate)

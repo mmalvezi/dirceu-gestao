@@ -333,13 +333,14 @@ class ResultadoOut(BaseModel):
 
 
 class PagamentoOut(BaseModel):
-    """Item da lista "Pagos a ajudantes" (derivada do diário)."""
+    """Item da lista "Pagos a ajudantes" (derivada do diário de máquinas E serviços)."""
 
     data: date
     ajudante_id: int | None
     ajudante_nome: str
-    maquina_id: int
-    maquina_nome: str
+    origem_id: int  # id da máquina ou do serviço
+    origem_nome: str  # nome da máquina ou descrição do serviço
+    origem_tipo: str  # maquina / servico
     horas: float
     valor: float
     origem: str
@@ -463,12 +464,13 @@ class HorasDia(BaseModel):
 
 class MaquinaAndamentoDash(BaseModel):
     id: int
-    nome: str
+    nome: str  # nome da máquina OU descrição do serviço
     status: str
-    empreita: float
+    empreita: float  # empreita (máquina) OU valor (serviço)
     custo_dirceu: float
-    margem: float
+    margem: float  # margem (máquina) OU resultado (serviço)
     pct_consumido: int
+    tipo: str = "maquina"  # maquina / servico — a tela navega conforme
 
 
 class Aviso(BaseModel):
@@ -477,6 +479,7 @@ class Aviso(BaseModel):
     # Campos p/ tornar o aviso acionável na tela (link/navegação):
     tipo: str | None = None  # fechamento_pendente / custo_alto / caixa / adiantamento_antigo
     maquina_id: int | None = None
+    servico_id: int | None = None
 
 
 class DashboardOut(BaseModel):

@@ -9,7 +9,7 @@ Horas somam todas (inclusive as próprias): horas são esforço, não dinheiro.
 from dataclasses import dataclass, field
 from decimal import Decimal
 
-from sqlalchemy import func
+from sqlalchemy import false, func
 from sqlalchemy.orm import Session
 
 from app.models import (
@@ -171,3 +171,82 @@ def calcular_margem_pct(empreita, custo_dirceu: Decimal) -> tuple[Decimal, int]:
     margem = empreita - custo_dirceu
     pct = int(round(custo_dirceu / empreita * 100)) if empreita > 0 else 0
     return margem, pct
+
+
+# ---- Agregados de diário no PERÍODO, abrangendo máquinas E serviços ----
+# (um pagamento/hora é o mesmo, tenha sido numa empreita ou num serviço avulso)
+
+_DIARIOS = (
+    (DiarioEntrada, DiarioTrabalho),
+    (ServicoEntrada, ServicoTrabalho),
+)
+
+
+def trabalhos_por_origem_periodo(db, de, ate) -> dict[str, tuple[Decimal, Decimal]]:
+    """{origem: (valor, horas)} somando os dois diários no período."""
+    out: dict[str, list[Decimal]] = {}
+    for Ent, Trab in _DIARIOS:
+        rows = (
+            db.query(
+                Trab.origem,
+                func.coalesce(func.sum(Trab.valor), 0),
+                func.coalesce(func.sum(Trab.horas), 0),
+            )
+            .join(Ent, Trab.entrada_id == Ent.id)
+            .filter(Ent.data >= de, Ent.data <= ate)
+            .group_by(Trab.origem)
+            .all()
+        )
+        for origem, valor, horas in rows:
+            acc = out.setdefault(origem, [ZERO, ZERO])
+            acc[0] += _dec(valor)
+            acc[1] += _dec(horas)
+    return {o: (v, h) for o, (v, h) in out.items()}
+
+
+def horas_por_data_periodo(db, de, ate) -> dict:
+    """{data: horas} somando os dois diários no período."""
+    out: dict = {}
+    for Ent, Trab in _DIARIOS:
+        rows = (
+            db.query(Ent.data, func.coalesce(func.sum(Trab.horas), 0))
+            .join(Trab, Trab.entrada_id == Ent.id)
+            .filter(Ent.data >= de, Ent.data <= ate)
+            .group_by(Ent.data)
+            .all()
+        )
+        for data, horas in rows:
+            out[data] = out.get(data, ZERO) + _dec(horas)
+    return out
+
+
+def ajudantes_distintos_periodo(db, de, ate) -> int:
+    """Nº de ajudantes distintos (exclui o Dirceu/proprio) nos dois diários."""
+    nomes: set[str] = set()
+    for Ent, Trab in _DIARIOS:
+        rows = (
+            db.query(Trab.ajudante_nome)
+            .join(Ent, Trab.entrada_id == Ent.id)
+            .filter(Ent.data >= de, Ent.data <= ate, Trab.proprio == false())
+            .distinct()
+            .all()
+        )
+        nomes.update(n for (n,) in rows)
+    return len(nomes)
+
+
+def bolso_periodo(db, de, ate) -> Decimal:
+    """Σ diárias origem 'bolso' nos dois diários (saída real do Dirceu no período)."""
+    return trabalhos_por_origem_periodo(db, de, ate).get("bolso", (ZERO, ZERO))[0]
+
+
+def repasse_pago_total(db) -> Decimal:
+    """Σ diárias 'repasse' acumuladas (sem período), nos dois diários."""
+    total = ZERO
+    for _, Trab in _DIARIOS:
+        total += _dec(
+            db.query(func.coalesce(func.sum(Trab.valor), 0))
+            .filter(Trab.origem == "repasse")
+            .scalar()
+        )
+    return total
